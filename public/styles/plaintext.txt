@@ -1,0 +1,7 @@
+/public/styles/
+├── variables.scss    # Sass变量
+├── element-theme.scss # Element主题覆盖
+├── utilities.css     # 工具类
+└── components/
+    ├── buttons.css   # 按钮样式
+    └── forms.css     # 表单样式
