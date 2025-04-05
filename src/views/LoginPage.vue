@@ -90,7 +90,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useAuthStore } from '@/stores/modules/auth'
+import { useAuthStore } from '@/stores'
 import { ElMessage } from 'element-plus'
 import { userRegisterAPI } from '@/api/userAPI'
 import router from '@/router'

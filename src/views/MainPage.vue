@@ -2,7 +2,7 @@
 import { RouterView, useRouter } from 'vue-router'
 import { ref } from 'vue'
 import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/stores'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -13,7 +13,7 @@ const showUserCard = ref(false)
 // 用户信息（后续从store中获取）
 const userInfo = ref({
   avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-  username: '测试用户',
+  username: auth.user.username,
 })
 
 // 导航到对应路由

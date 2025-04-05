@@ -143,3 +143,60 @@ Element Plus 的 ElMessage 组件默认样式会影响页面布局，因为：
 2. 对于需要全局覆盖的样式，最好使用独立的样式文件
 3. 在使用 scoped 样式时，需要注意选择器的作用范围和使用方式
 4. 在升级框架版本时，需要注意 API 和语法的变化
+
+## Pinia 状态持久化失效问题
+
+### 问题描述
+
+- 时间：[当前日期]
+- 问题：登录成功后刷新页面，Pinia 中的状态被清空，导致用户被退出到登录页面
+- 影响：用户体验差，需要重复登录
+
+### 问题原因
+
+1. Pinia 持久化插件配置不完整
+2. Store 的持久化策略配置有误
+3. Pinia 实例的创建和注册顺序可能影响持久化的正常工作
+
+### 解决方案
+
+1. 正确配置 pinia-plugin-persistedstate 插件：
+
+```javascript
+// src/stores/index.js
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+const pinia = createPinia()
+pinia.use(piniaPluginPersistedstate)
+```
+
+2. 修改 auth store 的持久化配置：
+
+```javascript
+{
+  persist: {
+    enabled: true,
+    strategies: [
+      {
+        key: 'auth-store',
+        storage: localStorage,
+        paths: ['isAuthenticated', 'user', 'token']
+      }
+    ]
+  }
+}
+```
+
+3. 确保 Pinia 在 router 之前初始化：
+
+```javascript
+// src/main.js
+app.use(pinia) // 先初始化 Pinia
+app.use(router)
+```
+
+### 经验教训
+
+1. 使用 Pinia 持久化插件时，需要正确配置插件和持久化策略
+2. 注意 Vue 应用中各插件的初始化顺序
+3. 在使用持久化存储时，建议指定明确的存储键名和需要持久化的字段
+4. 对于敏感信息（如 token），建议同时使用 localStorage 作为备份存储

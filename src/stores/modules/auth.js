@@ -10,12 +10,14 @@ export const useAuthStore = defineStore(
     const user = ref(null)
     const loading = ref(false)
     const error = ref(null)
+    const token = ref(localStorage.getItem('token') || '')
 
     // getters (使用computed)
     const userIsAuthenticated = computed(() => isAuthenticated.value)
     const getUserInfo = computed(() => user.value)
     const getLoading = computed(() => loading.value)
     const getError = computed(() => error.value)
+    const getToken = computed(() => token.value)
 
     // actions
     const setLoading = (status) => {
@@ -35,6 +37,8 @@ export const useAuthStore = defineStore(
       user.value = null
       isAuthenticated.value = false
       error.value = null
+      localStorage.removeItem('token')
+      token.value = ''
     }
 
     const login = async (credentials) => {
@@ -46,6 +50,7 @@ export const useAuthStore = defineStore(
 
         if (response.user) {
           setUser(response.user)
+          token.value = response.token
           localStorage.setItem('token', response.token)
         }
 
@@ -64,13 +69,13 @@ export const useAuthStore = defineStore(
       user,
       loading,
       error,
-
+      token,
       // getters
       userIsAuthenticated,
       getUserInfo,
       getLoading,
       getError,
-
+      getToken,
       // actions
       setLoading,
       setError,
@@ -81,9 +86,14 @@ export const useAuthStore = defineStore(
   },
   {
     persist: {
-      key: 'auth',
-      storage: localStorage,
-      paths: ['isAuthenticated', 'user'],
+      enabled: true,
+      strategies: [
+        {
+          key: 'auth-store',
+          storage: localStorage,
+          paths: ['isAuthenticated', 'user', 'token'],
+        },
+      ],
     },
   },
 )
