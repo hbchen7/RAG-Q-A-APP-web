@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 const instance = axios.create({
   // TODO 1. 基础地址，超时时间
   baseURL,
-  timeout: 10000,
+  timeout: 100000,
   withCredentials: true, // 添加这一行
 })
 instance.interceptors.request.use(

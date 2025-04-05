@@ -1,10 +1,36 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Plus, Delete, Setting } from '@element-plus/icons-vue'
+import { sayHelloAPI } from '@/api/chatAPI'
+// import { LLMconfig } from '@/stores'
 
 // 当前选中的助手和话题
 const currentAssistant = ref(null)
 const currentTopic = ref(null)
+
+// 聊天消息
+const messages = ref([])
+// 输入框内容
+const inputMessage = ref('')
+const llm_config = ref({
+  supplier: 'ollama',
+  model: 'deepseek-r1:latest',
+  apiKey: '',
+})
+const chat_config = ref({
+  chat_history_max_length: 5,
+  temperature: 0.8,
+})
+// const knowledge_config = ref({
+//   embedding_supplier: 'ollama',
+// })
+
+// 修改chat对象为计算属性，确保始终获取最新值
+const chat = computed(() => ({
+  question: inputMessage.value,
+  chat_config: chat_config.value,
+  llm_config: llm_config.value,
+}))
 
 // 选项卡激活项
 const activeTab = ref('assistants')
@@ -22,16 +48,15 @@ const assistants = ref([
 ])
 
 const topics = ref([
-  { id: 1, assistantId: 1, name: '项目规划', lastMessage: '让我们开始规划项目...' },
+  {
+    id: 1,
+    assistantId: 1,
+    name: '默认话题',
+    lastMessage: '我是DeepSeek-R1,我能帮你...',
+  },
   { id: 2, assistantId: 1, name: '需求分析', lastMessage: '首先我们来分析需求...' },
   { id: 3, assistantId: 2, name: 'Vue3开发', lastMessage: 'Vue3的新特性包括...' },
 ])
-
-// 聊天消息
-const messages = ref([])
-
-// 输入框内容
-const inputMessage = ref('')
 
 // 选择助手
 const selectAssistant = (assistant) => {
@@ -61,28 +86,28 @@ const loadMessages = () => {
 }
 
 // 发送消息
-const sendMessage = () => {
+const sendMessage = async () => {
+  // 检查输入是否为空
   if (!inputMessage.value.trim()) return
-
   // 添加用户消息
   messages.value.push({
     id: Date.now(),
     type: 'user',
     content: inputMessage.value,
   })
-
-  // TODO: 调用API发送消息
+  //
+  const message = chat.value
   // 清空输入框
   inputMessage.value = ''
-
-  // 模拟助手回复
-  setTimeout(() => {
-    messages.value.push({
-      id: Date.now() + 1,
-      type: 'assistant',
-      content: '我收到了你的消息，正在处理中...',
-    })
-  }, 1000)
+  console.log(message)
+  // 调用API发送消息
+  const answer = await sayHelloAPI(message)
+  // 助手回复
+  messages.value.push({
+    id: Date.now() + 1,
+    type: 'assistant',
+    content: answer,
+  })
 }
 </script>
 
