@@ -26,15 +26,28 @@ const router = createRouter({
           name: 'library',
           component: () => import('@/views/LibraryPage.vue'),
         },
-        {
-          path: 'personal',
-          name: 'personal',
-          component: () => import('@/views/PersonalPage.vue'),
-        },
+
         {
           path: 'setting',
           name: 'setting',
           component: () => import('@/views/SettingPage.vue'),
+          children: [
+            {
+              path: 'modelConfig',
+              name: 'modelConfig',
+              component: () => import('@/views/setting/modelsConfigPage.vue'),
+            },
+            {
+              path: 'defaultModel',
+              name: 'defaultModel',
+              component: () => import('@/views/setting/defaultModelPage.vue'),
+            },
+            {
+              path: 'about',
+              name: 'about',
+              component: () => import('@/views/setting/aboutPage.vue'),
+            },
+          ],
         },
       ],
     },

@@ -11,6 +11,15 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      '/oneapi': {
+        target: 'http://localhost:3000', // OneAPI 地址
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/oneapi/, ''),
+      },
+    },
+  },
   plugins: [
     vue(),
     vueDevTools(),
@@ -23,7 +32,13 @@ export default defineConfig({
     }),
   ],
   // base: '/',
-
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@use '@/assets/styles/theme.scss' as *;`,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -1,0 +1,26 @@
+/*背景色 */
+$light-bg: #ecf0f3;
+
+// 阴影参数
+$shadow-dark: #d1d9e6;
+$shadow-light: #f9f9f9;
+
+// 主色调
+$primary-color: #4b70e2;
+$primary-hover: #f5f7fa;
+$primary-active: #e4eaf1;
+
+// 文本颜色
+$text-primary: #333;
+$text-secondary: #999;
+
+// 阴影变量
+$box-shadow-outer-m:
+  2px 2px 4px rgba(0, 0, 0, 0.05),
+  -2px -2px 4px rgba(255, 255, 255, 0.8);
+$box-shadow-inner-m:
+  inset 2px 2px 4px $shadow-dark,
+  inset -2px -2px 4px $shadow-light;
+
+// 圆角
+$border-radius-m: 8px;

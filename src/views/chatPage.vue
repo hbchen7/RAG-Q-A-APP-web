@@ -86,6 +86,7 @@ const loadMessages = () => {
 }
 
 // 发送消息
+
 const sendMessage = async () => {
   // 检查输入是否为空
   if (!inputMessage.value.trim()) return
@@ -211,16 +212,11 @@ const sendMessage = async () => {
 </template>
 
 <style lang="scss" scoped>
-// 添加新拟态变量
-$light-bg: #ecf0f3;
-$shadow-dark: #d1d9e6;
-$shadow-light: #f9f9f9;
-
 .chat-container {
   display: flex;
   height: calc(100vh - 40px);
-  background-color: $light-bg; // 使用统一背景色
-  border-radius: 8px;
+  background-color: $light-bg;
+  border-radius: $border-radius-m;
 }
 
 .sidebar {
@@ -250,7 +246,7 @@ $shadow-light: #f9f9f9;
 
   span {
     font-weight: 500;
-    color: #333;
+    color: $text-primary;
   }
 }
 
@@ -262,17 +258,17 @@ $shadow-light: #f9f9f9;
   display: flex;
   align-items: center;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: $border-radius-m;
   cursor: pointer;
   margin-bottom: 8px;
   transition: all 0.3s;
 
   &:hover {
-    background-color: #f5f7fa;
+    background-color: $primary-hover;
   }
 
   &.active {
-    background-color: #e4eaf1;
+    background-color: $primary-active;
   }
 
   .item-name {
@@ -291,7 +287,7 @@ $shadow-light: #f9f9f9;
 
     .topic-message {
       font-size: 12px;
-      color: #999;
+      color: $text-secondary;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -312,7 +308,7 @@ $shadow-light: #f9f9f9;
   padding: 20px;
   overflow-y: auto;
   margin: 16px;
-  border-radius: 8px;
+  border-radius: $border-radius-m;
   // 内凹效果
   box-shadow:
     inset 4px 4px 8px $shadow-dark,
@@ -329,7 +325,7 @@ $shadow-light: #f9f9f9;
     margin-bottom: 20px;
 
     &.user .message-content {
-      background-color: #4b70e2; // 统一主色调
+      background-color: $primary-color; // 统一主色调
       color: #fff;
     }
 
@@ -350,20 +346,20 @@ $shadow-light: #f9f9f9;
     justify-content: flex-end;
 
     .message-content {
-      background-color: #409eff;
+      background-color: $primary-color;
       color: #fff;
     }
   }
 
   &.assistant .message-content {
     background-color: #f4f4f5;
-    color: #333;
+    color: $text-primary;
   }
 
   .message-content {
     max-width: 80%;
     padding: 12px 16px;
-    border-radius: 8px;
+    border-radius: $border-radius-m;
     font-size: 14px;
     line-height: 1.5;
   }
@@ -372,52 +368,42 @@ $shadow-light: #f9f9f9;
 .chat-input {
   padding: 20px;
   margin: 0 16px 16px;
-  border-radius: 8px;
+  border-radius: $border-radius-m;
   background-color: $light-bg;
-  // // 外凸效果
-  // box-shadow:
-  //   4px 4px 8px $shadow-dark,
-  //   -4px -4px 8px $shadow-light;
 
   :deep(.el-textarea__inner) {
     background-color: $light-bg;
     // 内凹效果
-    box-shadow:
-      inset 2px 2px 4px $shadow-dark,
-      inset -2px -2px 4px $shadow-light;
-    border: none;
-    border-radius: 8px;
+    box-shadow: $box-shadow-inner-m;
+    border-radius: $border-radius-m;
   }
 
   .input-actions {
     margin-top: 12px;
     display: flex;
-    justify-content: flex-end; // 改为右对齐
-    align-items: center;
+    justify-content: flex-end;
 
     .el-button-group {
-      border-radius: 8px;
+      border-radius: $border-radius-m;
       padding: 4px;
       background-color: $light-bg;
 
       .el-button {
         background-color: $light-bg;
         border: none;
-        color: #4b70e2; // 统一主色调
+        color: $primary-color;
         box-shadow: none;
 
         &:hover {
-          color: #3a5bbf; // 加深色调
+          color: $primary-hover;
         }
 
         &:active {
-          box-shadow:
-            inset 2px 2px 4px $shadow-dark,
-            inset -2px -2px 4px $shadow-light;
+          box-shadow: $box-shadow-inner-m;
         }
 
         &.el-button--primary {
-          background-color: #4b70e2;
+          background-color: $primary-color;
           color: white;
         }
       }
