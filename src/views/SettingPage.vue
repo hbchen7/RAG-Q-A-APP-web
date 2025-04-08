@@ -1,11 +1,7 @@
 <script setup>
 import { RouterView, useRouter } from 'vue-router'
-import { ref } from 'vue'
-import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
-import { useAuthStore } from '@/stores'
-
+import { ChatDotSquare, Collection, Setting } from '@element-plus/icons-vue'
 const router = useRouter()
-const auth = useAuthStore()
 
 // 导航到对应路由
 const handleNavigation = (route) => {
@@ -85,8 +81,9 @@ const handleNavigation = (route) => {
   }
 }
 .main-content {
-  padding-left: 10px;
-  padding-top: 0x;
+  // padding-left: 10px;
+  // padding-top: 0x;
+  padding: 0;
   overflow: hidden;
 }
 </style>

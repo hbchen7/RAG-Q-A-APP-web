@@ -3,7 +3,7 @@ import { RouterView, useRouter } from 'vue-router'
 import { ref } from 'vue'
 import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores'
-import { getUserInfoAPI } from '@/api/userAPI'
+import { login_Oneapi, getModelTokens_Oneapi } from '@/api/oneapi'
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -18,8 +18,10 @@ const userInfo = ref({
 
 // 导航到对应路由
 const handleNavigation = async (route) => {
-  const test = await getUserInfoAPI()
-  console.log(test)
+  const res = await login_Oneapi('hbchen7', 'sonetto1999')
+  console.log(res)
+  const modelTokens = await getModelTokens_Oneapi()
+  console.log(modelTokens)
   router.push({ name: route })
 }
 

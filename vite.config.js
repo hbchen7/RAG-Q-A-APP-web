@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/oneapi': {
-        target: 'http://localhost:3000', // OneAPI 地址
+        target: 'http://localhost:3001', // OneAPI 地址
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/oneapi/, ''),
       },

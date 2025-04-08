@@ -5,13 +5,6 @@
 ## 前端
 
 - Vue3--前端框架
-
-### 代码规范
-
-Eslint9 + Prettier + Husky + lint-staged
-
-### 其他
-
 - pnpm --包管理工具
 - ElementPlus --UI组件库
 - ElementPlus/icons --图标库
@@ -19,6 +12,7 @@ Eslint9 + Prettier + Husky + lint-staged
 - pinia--状态管理库
 - vite--打包工具
 - sass--css预处理器
+- Eslint9 + Prettier --代码规范工具
 
 # 前端项目结构
 
@@ -52,3 +46,7 @@ Eslint9 + Prettier + Husky + lint-staged
 pnpm install
 pnpm dev
 ```
+
+# 相关项目-特此鸣谢
+
+- [One API](https://github.com/songquanpeng/one-api)

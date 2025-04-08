@@ -24,3 +24,41 @@ $box-shadow-inner-m:
 
 // 圆角
 $border-radius-m: 8px;
+
+// 过渡效果
+$transition-duration: 0.1s;
+$transition-timing-function: ease-in-out;
+
+// 按钮hover、active效果
+@mixin botton-hover-active-effect(
+  $HoverScale: 1.1,
+  $ActiveScale: 0.98,
+  $is-box-shadow: true
+) {
+  transition: transform $transition-duration $transition-timing-function;
+  &:hover {
+    transform: scale($HoverScale);
+  }
+  &:active {
+    transform: scale($ActiveScale); // 轻微缩小
+    @if $is-box-shadow {
+      box-shadow: $box-shadow-inner-m; // 内凹效果
+    }
+  }
+}
+
+// 输入框内凹效果
+@mixin textarea_inner-effect($padding: 16px, $margin: 0 16px 16px, $inner: true) {
+  padding: $padding;
+  margin: $margin;
+  border-radius: $border-radius-m;
+  background-color: $light-bg;
+
+  @if $inner {
+    :deep(.el-textarea__inner) {
+      background-color: $light-bg;
+      box-shadow: $box-shadow-inner-m; // 内凹效果
+      border-radius: $border-radius-m;
+    }
+  }
+}

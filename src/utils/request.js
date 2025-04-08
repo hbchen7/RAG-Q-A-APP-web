@@ -7,7 +7,7 @@ const instance = axios.create({
   // TODO 1. 基础地址，超时时间
   baseURL,
   timeout: 100000,
-  withCredentials: true, // 添加这一行
+  withCredentials: true, // 跨域请求时携带cookie
 })
 instance.interceptors.request.use(
   (config) => {

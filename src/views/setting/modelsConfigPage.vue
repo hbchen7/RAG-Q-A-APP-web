@@ -1,7 +1,7 @@
 <template>
   <div class="oneapi-container">
     <iframe
-      src="http://localhost:3000/channel"
+      src="http://localhost:3001/token"
       style="width: 100%; height: 100vh; border: none"
       title="OneAPI 配置面板"
     />

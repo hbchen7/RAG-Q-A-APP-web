@@ -10,3 +10,4 @@ export default pinia
 export * from './modules/user'
 export * from './modules/auth'
 export * from './modules/LLMconfig'
+export * from './modules/oneapiModelList'
