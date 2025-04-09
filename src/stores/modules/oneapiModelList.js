@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { getModelTokens_Oneapi } from '@/api/oneapi'
 import { ElMessage } from 'element-plus'
 
+const STORE_KEY = 'oneapi_token_config' // 定义本地存储的 Key
+
 export const oneapiModelListStore = defineStore(
   'oneapi_token_store',
   () => {
@@ -132,6 +134,19 @@ export const oneapiModelListStore = defineStore(
       }
     }
 
+    // 新增：清除持久化数据并重置状态
+    const clearPersistedData = () => {
+      tokenList.value = []
+      selectedToken.value = null
+      selectedModel.value = null
+      loading.value = false
+      error.value = null
+      // 停止自动刷新
+      cleanup()
+      // 明确清除 localStorage 中的数据
+      localStorage.removeItem(STORE_KEY)
+    }
+
     return {
       // 状态
       tokenList,
@@ -149,6 +164,7 @@ export const oneapiModelListStore = defineStore(
       selectModel,
       init,
       cleanup,
+      clearPersistedData, // 导出新函数
     }
   },
   {
@@ -156,7 +172,7 @@ export const oneapiModelListStore = defineStore(
       enabled: true,
       strategies: [
         {
-          key: 'oneapi_token_config',
+          key: STORE_KEY, // 使用定义的 Key
           storage: localStorage,
           paths: ['tokenList', 'selectedToken', 'selectedModel'],
         },

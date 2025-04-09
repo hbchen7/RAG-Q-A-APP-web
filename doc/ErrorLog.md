@@ -233,3 +233,47 @@ app.use(router)
 - 浏览器控制台的错误不一定都源于当前正在开发的 Web 应用本身，浏览器扩展也可能注入脚本并产生错误。
 - 分析错误信息中的文件名 (`content_script.js`)、域名 (`analytics.immersivetranslate.com`) 和错误详情 (Cloudflare 错误页) 是定位问题来源的关键。
 - 对于非应用本身引起的错误，排查浏览器环境（特别是扩展程序）是首要步骤。
+
+## 登录页面容器居中问题
+
+### 问题描述
+
+- 时间：[2024-07-27]
+- 问题：登录页面的 shell 容器无法在页面中完全居中显示
+- 具体表现：
+  - 容器水平居中，但垂直方向贴着顶部
+  - 使用 `:deep(body)` 选择器设置 flex 布局无效
+  - 使用 `margin: auto` 只能实现水平居中
+
+### 问题原因
+
+1. Vue 的 scoped CSS 中，`:deep()` 选择器直接修改 `html` 或 `body` 标签可能因为 Vue 的渲染机制而无法生效
+2. 使用 `margin: auto` 在非 flex 布局中只能实现水平居中
+3. 响应式布局的 transform 属性与居中定位产生冲突
+
+### 解决方案
+
+使用绝对定位（`position: absolute`）结合 `transform` 属性实现完全居中：
+
+```css
+.shell {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* 其他样式保持不变 */
+}
+```
+
+### 实现原理
+
+1. `position: absolute` 使元素相对于最近的已定位祖先元素（或 body）进行定位
+2. `top: 50%` 和 `left: 50%` 将元素的左上角定位到页面的中心点
+3. `transform: translate(-50%, -50%)` 将元素向左和向上移动自身宽度和高度的一半，实现精确居中
+
+### 经验教训
+
+1. 在 Vue 的 scoped CSS 中，直接修改 `html` 或 `body` 标签的样式可能不可靠
+2. 使用绝对定位结合 transform 是实现元素居中的可靠方法
+3. 在实现响应式布局时，需要注意 transform 属性的使用，避免与定位属性产生冲突
+4. 对于需要精确控制位置的元素，优先考虑使用绝对定位而不是 flex 布局

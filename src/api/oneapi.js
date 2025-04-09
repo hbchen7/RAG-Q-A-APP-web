@@ -13,6 +13,13 @@ export const login_Oneapi = async (username, password) => {
   })
 }
 
+export const register_Oneapi = async (username, password) => {
+  return await oneapiRequest.post('/api/user/register', {
+    username,
+    password,
+  })
+}
+
 /**
  * 根据当前用户的 cookie 获取其在 OneAPI 中的令牌列表
  * @returns {Promise<Array<object>>} 返回用户的令牌列表，

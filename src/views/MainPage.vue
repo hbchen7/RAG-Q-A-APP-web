@@ -2,10 +2,10 @@
 import { RouterView, useRouter } from 'vue-router'
 import { ref } from 'vue'
 import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
-import { useAuthStore } from '@/stores'
-import { login_Oneapi, getModelTokens_Oneapi } from '@/api/oneapi'
+import { useAuthStore, oneapiModelListStore } from '@/stores'
 const router = useRouter()
 const auth = useAuthStore()
+const oneapiModelList = oneapiModelListStore()
 
 // 控制用户信息卡片的显示
 const showUserCard = ref(false)
@@ -18,15 +18,12 @@ const userInfo = ref({
 
 // 导航到对应路由
 const handleNavigation = async (route) => {
-  const res = await login_Oneapi('hbchen7', 'sonetto1999')
-  console.log(res)
-  const modelTokens = await getModelTokens_Oneapi()
-  console.log(modelTokens)
   router.push({ name: route })
 }
 
 // 退出登录
 const handleLogout = () => {
+  oneapiModelList.clearPersistedData() // 清除持久化数据
   auth.logout()
   router.push('/login')
 }
@@ -81,7 +78,8 @@ const handleLogout = () => {
             <template #title>个人中心</template>
           </el-menu-item>
 
-          <el-menu-item index="setting" @click="handleNavigation('setting')">
+          <el-menu-item index="setting" @click="handleNavigation('modelConfig')">
+            <!-- 默认进入第一项 -->
             <el-icon><Setting /></el-icon>
             <template #title>设置</template>
           </el-menu-item>

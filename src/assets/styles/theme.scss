@@ -15,10 +15,10 @@ $text-primary: #333;
 $text-secondary: #999;
 
 // 阴影变量
-$box-shadow-outer-m:
+$box-shadow-outer-m://外凸效果
   2px 2px 4px rgba(0, 0, 0, 0.05),
   -2px -2px 4px rgba(255, 255, 255, 0.8);
-$box-shadow-inner-m:
+$box-shadow-inner-m://内凹效果
   inset 2px 2px 4px $shadow-dark,
   inset -2px -2px 4px $shadow-light;
 

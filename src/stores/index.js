@@ -5,9 +5,6 @@ const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 
 export default pinia
-// /import useUserStore from './modules/user/
-// export {useUserStore}
-export * from './modules/user'
 export * from './modules/auth'
 export * from './modules/LLMconfig'
 export * from './modules/oneapiModelList'

@@ -40,6 +40,8 @@ const handleSelectModel = (modelId) => {
 const currentAssistant = ref(null)
 const currentTopic = ref(null)
 
+// 创建新话题
+
 // 聊天消息
 const messages = ref([])
 // 输入框内容
@@ -176,7 +178,7 @@ const sendMessage = async () => {
           <!-- 话题列表 -->
           <div class="list-header">
             <span>当前话题</span>
-            <el-button type="primary" :icon="Plus" circle size="small" />
+            <el-button @click="createNewTopic" :icon="Plus" circle size="small" />
           </div>
           <div class="list-content">
             <div
@@ -315,6 +317,7 @@ const sendMessage = async () => {
 <style lang="scss">
 /* 移除 scoped，因为需要影响全局样式 */
 .el-dropdown-menu {
+  box-shadow: $box-shadow-inner-m; // 内凹效果
   .el-dropdown-menu__item {
     .token-item {
       display: flex;
@@ -462,8 +465,8 @@ const sendMessage = async () => {
     flex: 1;
     display: flex;
     flex-direction: column;
-    position: relative; // 保持相对定位，如果内部有绝对定位元素
-    background-color: $light-bg; // 与 chat-container 一致
+    position: relative;
+    background-color: $light-bg;
 
     .chat-messages {
       flex: 1;

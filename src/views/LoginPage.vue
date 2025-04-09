@@ -44,12 +44,12 @@
           <i class="iconfont icon-weixin"></i>
           <i class="iconfont icon-bilibili-line"></i>
         </div>
-        <span class="form_span">选择登录方式或电子邮箱登录</span>
+        <span class="form_span">选择登录方式或用户名登录</span>
         <input
-          v-model="loginForm.email"
-          type="email"
+          v-model="loginForm.username"
+          type="text"
           class="form_input"
-          placeholder="Email"
+          placeholder="Username"
         />
         <input
           v-model="loginForm.password"
@@ -93,12 +93,15 @@ import { ref } from 'vue'
 import { useAuthStore } from '@/stores'
 import { ElMessage } from 'element-plus'
 import { userRegisterAPI } from '@/api/userAPI'
+// 同步注册登录oneapi
+import { login_Oneapi, register_Oneapi, getModelTokens_Oneapi  } from '@/api/oneapi'
+
 import router from '@/router'
 
 const auth = useAuthStore()
 
 // 控制登录/注册表单的切换
-const isLogin = ref(false)
+const isLogin = ref(true)
 
 // 注册表单数据
 const registerForm = ref({
@@ -109,9 +112,47 @@ const registerForm = ref({
 
 // 登录表单数据
 const loginForm = ref({
-  email: '',
+  username: '',
   password: '',
 })
+
+// 表单验证规则
+const validateForm = (form, isRegister = false) => {
+  // 如果是注册表单，验证邮箱格式
+  if (isRegister) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(form.email)) {
+      ElMessage.error('请输入有效的邮箱地址')
+      return false
+    }
+  }
+
+  // 验证密码长度
+  if (form.password.length < 8 || form.password.length > 20) {
+    ElMessage.error('密码长度必须在8-20个字符之间')
+    return false
+  }
+
+  // 如果是注册表单，验证用户名
+  if (isRegister) {
+    if (form.username.length > 12) {
+      ElMessage.error('用户名不能超过12个字符')
+      return false
+    }
+    if (form.username.length === 0) {
+      ElMessage.error('请输入用户名')
+      return false
+    }
+  }
+
+  // 登录表单验证用户名
+  if (!isRegister && form.username.length === 0) {
+    ElMessage.error('请输入用户名')
+    return false
+  }
+
+  return true
+}
 
 // 切换表单
 const switchForm = () => {
@@ -120,16 +161,21 @@ const switchForm = () => {
 
 // 处理注册
 const handleRegister = async () => {
+  // 表单验证
+  if (!validateForm(registerForm.value, true)) {
+    return
+  }
+
   try {
-    const res = await userRegisterAPI(registerForm.value)
-    const { _id } = res
-    console.log(res)
-    if (_id) {
-      ElMessage.success('注册成功！')
-      isLogin.value = true
-    } else {
-      ElMessage.error('注册失败，请重试')
-    }
+    await userRegisterAPI(registerForm.value)
+    ElMessage.success('注册成功！')
+    // 同步注册登录oneapi
+    const oneapiRegister = await register_Oneapi(
+      registerForm.value.username,
+      registerForm.value.password,
+    )
+    isLogin.value = true // 切换到登录表单
+    console.log(oneapiRegister)
   } catch (error) {
     ElMessage.error(error.message || '注册失败，请重试')
   }
@@ -137,12 +183,27 @@ const handleRegister = async () => {
 
 // 处理登录
 const handleLogin = async () => {
+  // 表单验证
+  if (!validateForm(loginForm.value)) {
+    return
+  }
+
   try {
-    const success = await auth.login(loginForm.value)
-    if (success) {
+    const username = await auth.login(loginForm.value)
+    if (username) {
+      // 同步注册登录oneapi
+      await login_Oneapi(loginForm.value.username, loginForm.value.password)
+      const test = await getModelTokens_Oneapi()
+      console.log(test)
       ElMessage.success('登录成功！')
-      // TODO: 登录成功后的路由跳转
-      router.push({ name: 'home' })
+
+      await router.push({ name: 'chat' })
+
+      // 如果仍然不生效，可以尝试强制刷新
+
+      // window.location.href = '/hello/chat'
+    } else {
+      ElMessage.error('用户名或密码错误')
     }
   } catch (error) {
     ElMessage.error(error.message || '登录失败，请重试')
@@ -162,7 +223,10 @@ const handleLogin = async () => {
 }
 
 .shell {
-  position: relative;
+  position: absolute; /* 修改为 absolute */
+  top: 50%; /* 定位到垂直中心 */
+  left: 50%; /* 定位到水平中心 */
+  transform: translate(-50%, -50%); /* 根据自身宽高调整，实现精确居中 */
   width: 1000px;
   min-width: 1000px;
   min-height: 600px;

@@ -54,7 +54,7 @@ export const useAuthStore = defineStore(
           localStorage.setItem('token', response.token)
         }
 
-        return true
+        return response.user.username
       } catch (err) {
         setError(err.message)
         return false
