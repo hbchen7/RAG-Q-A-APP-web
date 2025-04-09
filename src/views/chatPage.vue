@@ -125,6 +125,12 @@ const loadMessages = () => {
 // 发送消息
 
 const sendMessage = async () => {
+  // 新增：检查是否已选择模型
+  if (!OneapiStore.selectedModel) {
+    ElMessage.info('请先选择一个模型')
+    return // 阻止发送
+  }
+
   // 检查输入是否为空
   if (!inputMessage.value.trim()) return
   // 添加用户消息
