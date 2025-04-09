@@ -72,3 +72,39 @@ export const getModelTokens_Oneapi = async () => {
 export const getModels_oneapi = async () => {
   return await oneapiRequest.get('/v1/models')
 }
+
+/**
+ * 获取用户自身完整信息（包含额度）
+   接口路径: /api/user/self
+   请求方法: GET
+   控制器函数: controller.GetSelf
+   认证: 需要用户认证 (middleware.UserAuth())
+   响应示例:{
+    "data": {
+        "id": 9,
+        "username": "user1",
+        "password": "",
+        "display_name": "user1",
+        "role": 1,
+        "status": 1,
+        "email": "",
+        "github_id": "",
+        "wechat_id": "",
+        "lark_id": "",
+        "oidc_id": "",
+        "verification_code": "",
+        "access_token": "",
+        "quota": 971680,
+        "used_quota": 28320,
+        "request_count": 6,
+        "group": "default",
+        "aff_code": "9BS9",
+        "inviter_id": 0
+    },
+    "message": "",
+    "success": true
+}
+*/
+export const getSelf_Oneapi = async () => {
+  return await oneapiRequest.get('/api/user/self')
+}

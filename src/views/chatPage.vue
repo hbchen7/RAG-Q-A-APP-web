@@ -317,7 +317,6 @@ const sendMessage = async () => {
 <style lang="scss">
 /* 移除 scoped，因为需要影响全局样式 */
 .el-dropdown-menu {
-  box-shadow: $box-shadow-inner-m; // 内凹效果
   .el-dropdown-menu__item {
     .token-item {
       display: flex;
