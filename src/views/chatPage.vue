@@ -65,6 +65,7 @@ const llm_config = computed(() => ({
 // 修改 chat 计算属性，确保使用新的 llm_config
 const chat = computed(() => ({
   question: inputMessage.value,
+  session_id: '67f682688a8b9771bd096491',
   chat_config: chat_config.value,
   llm_config: llm_config.value,
 }))
@@ -165,7 +166,13 @@ const sendMessage = async () => {
           <!-- 助手列表 -->
           <div class="list-header">
             <span>我的助手</span>
-            <el-button type="primary" :icon="Plus" circle size="small" />
+            <el-button
+              @click="createNewAssistant"
+              type="primary"
+              :icon="Plus"
+              circle
+              size="small"
+            />
           </div>
           <div class="list-content">
             <div
@@ -184,7 +191,13 @@ const sendMessage = async () => {
           <!-- 话题列表 -->
           <div class="list-header">
             <span>当前话题</span>
-            <el-button @click="createNewTopic" :icon="Plus" circle size="small" />
+            <el-button
+              type="primary"
+              @click="createNewSession"
+              :icon="Plus"
+              circle
+              size="small"
+            />
           </div>
           <div class="list-content">
             <div
@@ -479,9 +492,7 @@ const sendMessage = async () => {
       overflow-y: auto;
       margin: 16px;
       border-radius: $border-radius-m;
-      box-shadow: // 内凹效果
-        inset 4px 4px 8px $shadow-dark,
-        inset -4px -4px 8px $shadow-light;
+      box-shadow: $box-shadow-inner-L; //内凹效果
       background-color: $light-bg;
 
       // 隐藏滚动条但保留滚动功能

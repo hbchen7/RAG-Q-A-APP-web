@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores'
-const baseURL = 'http://localhost:8080'
+const baseURL = 'http://localhost:8081'
 import router from '@/router'
 import { ElMessage } from 'element-plus'
 const instance = axios.create({

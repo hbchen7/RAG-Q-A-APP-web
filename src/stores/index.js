@@ -8,3 +8,4 @@ export default pinia
 export * from './modules/auth'
 export * from './modules/LLMconfig'
 export * from './modules/oneapiModelList'
+export * from './modules/session'
