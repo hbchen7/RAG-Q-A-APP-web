@@ -16,7 +16,7 @@ export const createSessionAPI = (data) => {
  * 获取指定用户的会话列表
  * @param {object} params - 查询参数
  * @param {string} params.username - 需要查询会话列表的用户名
- * @returns {Promise} 返回一个 Promise 对象，包含用户的会话列表
+ * @returns {Promise} 返回一个 Promise 对象，包含用户的会话列表 (按更新时间降序排序)
  */
 export const getSessionListAPI = (params) => {
   return request.get('/session/list', { params })

@@ -1,34 +1,17 @@
 <script setup>
 // chatPage.vue script部分
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Plus, Delete, Setting, MoreFilled } from '@element-plus/icons-vue'
-import { ElMessage, ElEmpty } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { sayHelloAPI } from '@/api/chatAPI'
 import { oneapiModelListStore } from '@/stores'
-import { useAssistantStore } from '@/stores/modules/assistant'
-import { useSessionStore } from '@/stores/modules/session'
-import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 
 // 使用 store
 const OneapiStore = oneapiModelListStore()
-const assistantStore = useAssistantStore()
-const sessionStore = useSessionStore()
 
 // 在组件挂载时初始化
-onMounted(async () => {
+onMounted(() => {
   OneapiStore.init()
-  console.log('组件挂载前的 currentAssistant:', assistantStore.currentAssistant)
-
-  // 获取助手列表
-  await assistantStore.fetchAssistantList()
-  console.log('获取列表后的 currentAssistant:', assistantStore.currentAssistant)
-
-  // 如果有当前选中的助手，加载其会话列表
-  const currentAssistant = assistantStore.currentAssistant
-  if (currentAssistant && currentAssistant._id) {
-    console.log('初始化时加载当前助手的会话列表...')
-    await sessionStore.fetchSessionList(currentAssistant._id)
-  }
 })
 
 // 在组件卸载时清理
@@ -54,8 +37,10 @@ const handleSelectModel = (modelId) => {
 }
 
 // 当前选中的助手和话题
-const currentAssistant = computed(() => assistantStore.getCurrentAssistant)
-const currentTopic = computed(() => sessionStore.getCurrentSession)
+const currentAssistant = ref(null)
+const currentTopic = ref(null)
+
+// 创建新话题
 
 // 聊天消息
 const messages = ref([])
@@ -89,135 +74,97 @@ const chat = computed(() => ({
 const activeTab = ref('assistants')
 
 // 模拟数据 - 实际项目中应该从API获取
-const assistants = computed(() => assistantStore.getAssistantList)
-const topics = computed(() => sessionStore.getSessionsList)
+const assistants = ref([
+  {
+    id: 1,
+    name: '通用助手',
+  },
+  {
+    id: 2,
+    name: '代码助手',
+  },
+])
+
+const topics = ref([
+  {
+    id: 1,
+    assistantId: 1,
+    name: '默认话题',
+    lastMessage: '我是DeepSeek-R1,我能帮你...',
+  },
+  { id: 2, assistantId: 1, name: '需求分析', lastMessage: '首先我们来分析需求...' },
+  { id: 3, assistantId: 2, name: 'Vue3开发', lastMessage: 'Vue3的新特性包括...' },
+])
 
 // 选择助手
-const handleSelectAssistant = async (assistant) => {
-  console.log('选择助手，传入的助手对象:', assistant)
-  assistantStore.selectAssistant(assistant)
-  console.log('选择后的 currentAssistant:', assistantStore.currentAssistant)
-
-  // 立即加载该助手的会话列表
-  if (assistant && assistant._id) {
-    await sessionStore.fetchSessionList(assistant._id)
-  }
-
-  // 切换到话题标签页
+const selectAssistant = (assistant) => {
+  currentAssistant.value = assistant
+  // 加载该助手下的话题列表
   activeTab.value = 'topics'
 }
 
 // 选择话题
-const handleSelectSession = (session) => {
-  sessionStore.setCurrentSession(session)
+const selectTopic = (topic) => {
+  currentTopic.value = topic
+  // TODO: 加载话题的聊天记录
   loadMessages()
 }
 
 // 加载消息记录
 const loadMessages = () => {
-  if (currentTopic.value) {
-    console.log(`需要加载会话 ${currentTopic.value.name} 的消息`)
-    messages.value = [
-      { id: 1, type: 'user', content: `这是会话 ${currentTopic.value.name} 的开始。` },
-      {
-        id: 2,
-        type: 'assistant',
-        content: '你好！有什么可以帮你的吗？',
-      },
-    ]
-  } else {
-    messages.value = []
-  }
+  // TODO: 从API获取消息记录
+  messages.value = [
+    { id: 1, type: 'user', content: '你好，请帮我规划一个项目。' },
+    {
+      id: 2,
+      type: 'assistant',
+      content: '好的，让我们开始。首先，请告诉我项目的基本需求。',
+    },
+  ]
 }
 
 // 发送消息
+
 const sendMessage = async () => {
+  // 新增：检查是否已选择模型
   if (!OneapiStore.selectedModel) {
     ElMessage.info('请先选择一个模型')
-    return
+    return // 阻止发送
   }
-  if (!currentTopic.value) {
-    ElMessage.info('请先选择一个话题')
-    return
-  }
-  if (!inputMessage.value.trim()) return
 
-  const userMessage = {
+  // 检查输入是否为空
+  if (!inputMessage.value.trim()) return
+  // 添加用户消息
+  messages.value.push({
     id: Date.now(),
     type: 'user',
     content: inputMessage.value,
-  }
-  messages.value.push(userMessage)
-
-  const messagePayload = chat.value
-  const currentInput = inputMessage.value
+  })
+  //
+  const message = chat.value
+  // 清空输入框
   inputMessage.value = ''
-
-  console.log('发送消息:', messagePayload)
-
-  try {
-    const answer = await sayHelloAPI(messagePayload)
-    messages.value.push({
-      id: Date.now() + 1,
-      type: 'assistant',
-      content: answer,
-    })
-  } catch (error) {
-    ElMessage.error('发送消息失败')
-    console.error('发送消息 API 调用失败:', error)
-    messages.value = messages.value.filter((m) => m.id !== userMessage.id)
-    inputMessage.value = currentInput
-  }
+  console.log(message)
+  // 调用API发送消息
+  const answer = await sayHelloAPI(message)
+  // 助手回复
+  messages.value.push({
+    id: Date.now() + 1,
+    type: 'assistant',
+    content: answer,
+  })
 }
 
-// 新增：控制创建助手对话框
-const showCreateAssistantDialog = ref(false)
+// 在 chatPage.vue 中修改计算属性
+// 修改前
+const currentAssistant = computed(() => assistantStore.getCurrentAssistant)
 
-const handleCreateAssistantConfirm = (assistantData) => {
-  assistantStore.createAssistant(assistantData)
-}
-
-// 新增：监听当前助手的变化，以加载会话列表
-watch(
-  () => assistantStore.currentAssistant,
-  async (newAssistant) => {
-    if (newAssistant && newAssistant._id) {
-      console.log(
-        `当前助手切换为: ${newAssistant.title || newAssistant.name} (ID: ${newAssistant._id}), 准备加载会话列表...`,
-      )
-      await sessionStore.fetchSessionList(newAssistant._id)
-    } else {
-      console.log('当前没有选中助手，清空会话列表。')
-      sessionStore.sessionsList = []
-      sessionStore.currentSession = null
-    }
-  },
-  { immediate: true }, // 添加 immediate: true，确保组件挂载时就执行一次
-)
-
-// 新增：监听当前会话变化，用于调试或触发其他逻辑
-watch(
-  () => sessionStore.currentSession,
-  (newSession) => {
-    if (newSession) {
-      console.log(`当前会话切换为: ${newSession.name} (ID: ${newSession.id})`)
-      loadMessages()
-    } else {
-      console.log('当前没有选中会话。')
-      messages.value = []
-    }
-  },
-)
-
-// 新增：打开创建助手对话框
-const openCreateAssistantDialog = () => {
-  showCreateAssistantDialog.value = true
-}
-
-// 新增：创建新会话
-const handleCreateSession = () => {
-  sessionStore.createSession()
-}
+// 修改后
+const currentAssistant = computed(() => {
+  const assistant = assistantStore.getCurrentAssistant
+  console.log('计算属性 currentAssistant 被访问，值为:', assistant) // 添加日志
+  return assistant
+})
 </script>
 
 <template>
@@ -231,7 +178,7 @@ const handleCreateSession = () => {
           <div class="list-header">
             <span>我的助手</span>
             <el-button
-              @click="openCreateAssistantDialog"
+              @click="createNewAssistant"
               type="primary"
               :icon="Plus"
               circle
@@ -239,18 +186,15 @@ const handleCreateSession = () => {
             />
           </div>
           <div class="list-content">
-            <div v-if="assistants.length > 0">
-              <div
-                v-for="assistant in assistants"
-                :key="assistant.id"
-                class="list-item"
-                :class="{ active: currentAssistant?.id === assistant.id }"
-                @click="handleSelectAssistant(assistant)"
-              >
-                <span class="item-name">{{ assistant.name || assistant.title }}</span>
-              </div>
+            <div
+              v-for="assistant in assistants"
+              :key="assistant.id"
+              class="list-item"
+              :class="{ active: currentAssistant?.id === assistant.id }"
+              @click="selectAssistant(assistant)"
+            >
+              <span class="item-name">{{ assistant.name }}</span>
             </div>
-            <el-empty v-else description="创建一个新助手吧" :image-size="60" />
           </div>
         </el-tab-pane>
 
@@ -260,28 +204,25 @@ const handleCreateSession = () => {
             <span>当前话题</span>
             <el-button
               type="primary"
-              @click="handleCreateSession"
+              @click="createNewSession"
               :icon="Plus"
               circle
               size="small"
-              :disabled="!currentAssistant"
             />
           </div>
           <div class="list-content">
-            <div v-if="topics.length > 0">
-              <div
-                v-for="topic in topics"
-                :key="topic._id"
-                class="list-item"
-                :class="{ active: currentTopic?._id === topic._id }"
-                @click="handleSelectSession(topic)"
-              >
-                <div class="topic-info">
-                  <div class="topic-name">{{ topic.name || topic.title }}</div>
-                </div>
+            <div
+              v-for="topic in topics"
+              :key="topic.id"
+              class="list-item"
+              :class="{ active: currentTopic?.id === topic.id }"
+              @click="selectTopic(topic)"
+            >
+              <div class="topic-info">
+                <div class="topic-name">{{ topic.name }}</div>
+                <div class="topic-message">{{ topic.lastMessage }}</div>
               </div>
             </div>
-            <el-empty v-else description="创建一个新会话吧" :image-size="60" />
           </div>
         </el-tab-pane>
 
@@ -400,11 +341,6 @@ const handleCreateSession = () => {
         </div>
       </template>
     </div>
-
-    <CreateAssistantDialog
-      v-model="showCreateAssistantDialog"
-      @confirm="handleCreateAssistantConfirm"
-    />
   </div>
 </template>
 

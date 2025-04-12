@@ -10,17 +10,17 @@ import request from '@/utils/request'
  * @returns {Promise} 返回一个 Promise 对象，包含创建的助手信息
  */
 export const createAssistantAPI = (data) => {
-  return request.post('/assistant', data)
+  return request.post('/assistant/create', data)
 }
 
 /**
  * @description 获取指定用户的助手列表
  * @param {object} params - 查询参数
  * @param {string} params.username - 需要查询助手列表的用户名
- * @returns {Promise} 返回一个 Promise 对象，包含用户的助手列表 (按创建时间降序排序)
+ * @returns {Promise} 返回一个 Promise 对象，包含用户的助手列表 (按创建时间升序排序)
  */
 export const getAssistantListAPI = (params) => {
-  return request.get('/assistant', { params })
+  return request.get('/assistant/list', { params })
 }
 
 /**
@@ -34,7 +34,7 @@ export const getAssistantListAPI = (params) => {
  */
 export const updateAssistantAPI = (assistantId, data) => {
   // 注意：username 在请求体中会被后端忽略，无需传递或后端会自动处理
-  return request.put(`/assistant/${assistantId}`, data)
+  return request.put(`/assistant/update/${assistantId}`, data)
 }
 
 /**
@@ -45,5 +45,5 @@ export const updateAssistantAPI = (assistantId, data) => {
  */
 export const deleteAssistantAPI = (params) => {
   // 根据后端 assistantRouter.py 定义，assistant_id 是查询参数
-  return request.delete('/assistant', { params })
+  return request.delete('/assistant/delete', { params })
 }
