@@ -2,7 +2,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getAssistantListAPI, createAssistantAPI } from '@/api/assistentAPI.js'
+import {
+  getAssistantListAPI,
+  createAssistantAPI,
+  updateAssistantAPI,
+  deleteAssistantAPI,
+} from '@/api/assistentAPI.js'
 import { useAuthStore } from './auth' // 引入 auth store
 
 /**
@@ -180,6 +185,79 @@ export const useAssistantStore = defineStore(
       console.log('设置后的 currentAssistant:', currentAssistant.value) // 添加日志
     }
 
+    /**
+     * @description 更新助手信息
+     * @param {string} assistantId - 要更新的助手 ID
+     * @param {object} data - 更新的数据
+     * @returns {Promise<void>}
+     */
+    const updateAssistant = async (assistantId, data) => {
+      if (!authStore.user) {
+        setError('用户未登录，无法更新助手')
+        ElMessage.error('请先登录')
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+      try {
+        const response = await updateAssistantAPI(assistantId, data)
+        ElMessage.success(`助手 "${response.title}" 更新成功`)
+
+        // 更新本地列表中的助手数据
+        const index = assistantList.value.findIndex((a) => a._id === assistantId)
+        if (index !== -1) {
+          assistantList.value[index] = { ...assistantList.value[index], ...response }
+          // 如果更新的是当前选中的助手，也更新 currentAssistant
+          if (currentAssistant.value && currentAssistant.value._id === assistantId) {
+            currentAssistant.value = { ...currentAssistant.value, ...response }
+          }
+        }
+      } catch (err) {
+        setError(err)
+        ElMessage.error(error.value || '更新助手失败')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    /**
+     * @description 删除助手
+     * @param {string} assistantId - 要删除的助手 ID
+     * @returns {Promise<void>}
+     */
+    const deleteAssistant = async (assistantId) => {
+      if (!authStore.user) {
+        setError('用户未登录，无法删除助手')
+        ElMessage.error('请先登录')
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+      try {
+        await deleteAssistantAPI({ assistant_id: assistantId })
+        ElMessage.success('助手删除成功')
+
+        // 从列表中移除该助手
+        assistantList.value = assistantList.value.filter((a) => a._id !== assistantId)
+
+        // 如果删除的是当前选中的助手，清除选中状态并选择新的助手
+        if (currentAssistant.value && currentAssistant.value._id === assistantId) {
+          if (assistantList.value.length > 0) {
+            selectAssistant(assistantList.value[0])
+          } else {
+            selectAssistant(null)
+          }
+        }
+      } catch (err) {
+        setError(err)
+        ElMessage.error(error.value || '删除助手失败')
+      } finally {
+        setLoading(false)
+      }
+    }
+
     return {
       // State
       assistantList,
@@ -197,6 +275,8 @@ export const useAssistantStore = defineStore(
       selectAssistant,
       setLoading, // 可选暴露
       setError, // 可选暴露
+      updateAssistant,
+      deleteAssistant,
     }
   },
   {

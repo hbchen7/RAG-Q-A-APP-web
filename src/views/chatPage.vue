@@ -1,13 +1,15 @@
 <script setup>
 // chatPage.vue script部分
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { Plus, Delete, Setting, MoreFilled } from '@element-plus/icons-vue'
-import { ElMessage, ElEmpty } from 'element-plus'
+import { Plus, Delete, Setting, MoreFilled, Edit } from '@element-plus/icons-vue'
+import { ElMessage, ElEmpty, ElMessageBox } from 'element-plus'
 import { sayHelloAPI } from '@/api/chatAPI'
-import { oneapiModelListStore } from '@/stores'
+import { oneapiModelListStore, useAuthStore } from '@/stores'
 import { useAssistantStore } from '@/stores/modules/assistant'
 import { useSessionStore } from '@/stores/modules/session'
 import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
+import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
+import EditSessionDialog from '@/components/EditSessionDialog.vue'
 
 const OneapiStore = oneapiModelListStore()
 const assistantStore = useAssistantStore()
@@ -217,6 +219,84 @@ const openCreateAssistantDialog = () => {
 const handleCreateSession = () => {
   sessionStore.createSession()
 }
+
+// 编辑助手相关
+const showEditAssistantDialog = ref(false)
+const editingAssistant = ref(null)
+
+const handleEditAssistant = (assistant) => {
+  editingAssistant.value = assistant
+  showEditAssistantDialog.value = true
+}
+
+const handleEditAssistantConfirm = async (data) => {
+  try {
+    // 在data中加入参数username
+    data.username = useAuthStore().user.username
+    await assistantStore.updateAssistant(editingAssistant.value._id, data)
+    showEditAssistantDialog.value = false
+    editingAssistant.value = null
+  } catch (error) {
+    console.error('编辑助手失败:', error)
+  }
+}
+
+const handleDeleteAssistant = async (assistant) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除助手 "${assistant.name || assistant.title}" 吗？\n删除后将无法恢复，且相关的会话也会被删除。`,
+      '删除确认',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+    await assistantStore.deleteAssistant(assistant._id)
+  } catch (err) {
+    if (err !== 'cancel') {
+      console.error('删除助手失败:', err)
+    }
+  }
+}
+
+// 编辑会话相关
+const showEditSessionDialog = ref(false)
+const editingSession = ref(null)
+
+const handleEditSession = (session) => {
+  editingSession.value = session
+  showEditSessionDialog.value = true
+}
+
+const handleEditSessionConfirm = async (data) => {
+  try {
+    await sessionStore.updateSessionTitle(editingSession.value._id, data.title)
+    showEditSessionDialog.value = false
+    editingSession.value = null
+  } catch (error) {
+    console.error('编辑会话失败:', error)
+  }
+}
+
+const handleDeleteSession = async (session) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除会话 "${session.name || session.title}" 吗？\n删除后将无法恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+    await sessionStore.deleteSession(session._id)
+  } catch (err) {
+    if (err !== 'cancel') {
+      console.error('删除会话失败:', err)
+    }
+  }
+}
 </script>
 
 <template>
@@ -247,6 +327,25 @@ const handleCreateSession = () => {
                 @click="handleSelectAssistant(assistant)"
               >
                 <span class="item-name">{{ assistant.name || assistant.title }}</span>
+                <el-dropdown trigger="click" @click.stop>
+                  <el-button
+                    :icon="MoreFilled"
+                    circle
+                    size="small"
+                    class="action-button"
+                    @click.stop
+                  />
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item @click="handleEditAssistant(assistant)">
+                        <el-icon><Edit /></el-icon>编辑
+                      </el-dropdown-item>
+                      <el-dropdown-item @click="handleDeleteAssistant(assistant)">
+                        <el-icon><Delete /></el-icon>删除
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </div>
             <el-empty v-else description="创建一个新助手吧" :image-size="60" />
@@ -278,6 +377,24 @@ const handleCreateSession = () => {
                 <div class="topic-info">
                   <div class="topic-name">{{ topic.name || topic.title }}</div>
                 </div>
+                <el-dropdown trigger="click" @click.stop>
+                  <el-button
+                    :icon="MoreFilled"
+                    circle
+                    size="small"
+                    class="action-button"
+                  />
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item @click="handleEditSession(topic)">
+                        <el-icon><Edit /></el-icon>编辑
+                      </el-dropdown-item>
+                      <el-dropdown-item @click="handleDeleteSession(topic)">
+                        <el-icon><Delete /></el-icon>删除
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </div>
             <el-empty v-else description="创建一个新会话吧" :image-size="60" />
@@ -404,6 +521,20 @@ const handleCreateSession = () => {
       v-model="showCreateAssistantDialog"
       @confirm="handleCreateAssistantConfirm"
     />
+
+    <!-- 编辑助手对话框 -->
+    <EditAssistantDialog
+      v-model="showEditAssistantDialog"
+      :assistant="editingAssistant"
+      @confirm="handleEditAssistantConfirm"
+    />
+
+    <!-- 编辑会话对话框 -->
+    <EditSessionDialog
+      v-model="showEditSessionDialog"
+      :session="editingSession"
+      @confirm="handleEditSessionConfirm"
+    />
   </div>
 </template>
 
@@ -502,6 +633,7 @@ const handleCreateSession = () => {
       .list-item {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         padding: 12px;
         cursor: pointer;
         margin-bottom: 8px;
@@ -516,13 +648,12 @@ const handleCreateSession = () => {
         }
 
         .item-name {
-          // 助手列表项特定样式
           margin-left: 12px;
           font-size: 14px;
+          flex: 1;
         }
 
         .topic-info {
-          // 话题列表项特定样式
           flex: 1;
           margin-left: 12px;
 
@@ -530,13 +661,19 @@ const handleCreateSession = () => {
             font-size: 14px;
             margin-bottom: 4px;
           }
+        }
 
-          .topic-message {
-            font-size: 12px;
-            color: $text-secondary;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .action-button {
+          opacity: 0.6;
+          color: $text-secondary;
+          background: transparent;
+          border: none;
+          padding: 6px;
+          margin-left: 8px;
+
+          &:hover {
+            opacity: 1;
+            background-color: rgba(0, 0, 0, 0.1);
           }
         }
       }

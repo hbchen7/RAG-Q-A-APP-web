@@ -33,7 +33,7 @@ export const getAssistantListAPI = (params) => {
  * @returns {Promise} 返回一个 Promise 对象，包含更新后的助手信息
  */
 export const updateAssistantAPI = (assistantId, data) => {
-  // 注意：username 在请求体中会被后端忽略，无需传递或后端会自动处理
+  // username 需要传入username
   return request.put(`/assistant/update/${assistantId}`, data)
 }
 
