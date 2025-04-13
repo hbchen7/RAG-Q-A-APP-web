@@ -27,6 +27,10 @@
 │   ├── store
 │   ├── utils
 │   ├── views
+|   |   ├── chatPage
+|   |   ├── SettingPage
+|   |   └── loginPage
+|   |   └── LibraryPage
 │   ├── App.vue
 │   ├── main.js
 │   └── shims-vue.d.ts
@@ -39,6 +43,19 @@
 ├──  tsconfig.json
 └──  vue.config.js
 ```
+
+## 页面详细结构
+
+- ChatPage
+  .chat-container
+  ├── .chat-sidebar
+  │ └── .sidebar-content
+  ├── .chat-main
+  │ ├── .chat-messages
+  │ │ ├── .message (用户消息)
+  │ │ └── .message.assistant (助手消息)
+  │ └── .chat-input
+  └── .empty-state
 
 # 运行项目
 

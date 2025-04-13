@@ -9,7 +9,6 @@ import { useAssistantStore } from '@/stores/modules/assistant'
 import { useSessionStore } from '@/stores/modules/session'
 import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 
-// 使用 store
 const OneapiStore = oneapiModelListStore()
 const assistantStore = useAssistantStore()
 const sessionStore = useSessionStore()
@@ -80,7 +79,7 @@ const llm_config = computed(() => ({
 // 修改 chat 计算属性，确保使用新的 llm_config
 const chat = computed(() => ({
   question: inputMessage.value,
-  session_id: '67f682688a8b9771bd096491',
+  session_id: currentTopic.value?._id,
   chat_config: chat_config.value,
   llm_config: llm_config.value,
 }))
@@ -242,9 +241,9 @@ const handleCreateSession = () => {
             <div v-if="assistants.length > 0">
               <div
                 v-for="assistant in assistants"
-                :key="assistant.id"
+                :key="assistant._id"
                 class="list-item"
-                :class="{ active: currentAssistant?.id === assistant.id }"
+                :class="{ active: currentAssistant?._id === assistant._id }"
                 @click="handleSelectAssistant(assistant)"
               >
                 <span class="item-name">{{ assistant.name || assistant.title }}</span>
@@ -500,15 +499,10 @@ const handleCreateSession = () => {
         }
       }
 
-      .list-content {
-        padding: 8px;
-      }
-
       .list-item {
         display: flex;
         align-items: center;
         padding: 12px;
-        border-radius: $border-radius-m;
         cursor: pointer;
         margin-bottom: 8px;
         transition: all 0.3s;
