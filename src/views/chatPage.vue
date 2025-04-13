@@ -117,11 +117,9 @@ const handleSelectSession = (session) => {
 // 加载消息记录
 const loadMessages = () => {
   if (currentTopic.value) {
-    console.log(`需要加载会话 ${currentTopic.value.name} 的消息`)
     messages.value = [
-      { id: 1, type: 'user', content: `这是会话 ${currentTopic.value.name} 的开始。` },
       {
-        id: 2,
+        id: 1,
         type: 'assistant',
         content: '你好！有什么可以帮你的吗？',
       },
