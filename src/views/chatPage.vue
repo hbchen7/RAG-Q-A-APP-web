@@ -74,12 +74,29 @@ const totalPages = ref(0)
 const renderedMessages = ref([])
 const scrollbarRef = ref(null)
 
-// 滚动到底部
+// 滚动到底部 - 使用 scrollTo 方法
 const scrollToBottom = () => {
-  if (scrollbarRef.value?.wrap) {
-    const { wrap } = scrollbarRef.value
-    wrap.scrollTop = wrap.scrollHeight
-  }
+  nextTick(() => {
+    const scrollbar = scrollbarRef.value
+    console.log('Attempting to scroll to bottom. Scrollbar ref:', scrollbar)
+    if (scrollbar && typeof scrollbar.scrollTo === 'function') {
+      // 获取 scrollHeight 可能仍然需要 wrap
+      const wrap = scrollbar.wrapRef // Element Plus 内部可能使用 wrapRef
+      if (wrap) {
+        const scrollHeight = wrap.scrollHeight
+        console.log('Scrollbar wrap found. scrollHeight:', scrollHeight)
+        scrollbar.scrollTo({ top: scrollHeight, behavior: 'smooth' }) // 使用 scrollTo 方法并添加平滑滚动
+        console.log('Called scrollbar.scrollTo({ top:', scrollHeight, '})')
+      } else {
+        console.warn('Scrollbar wrapRef not found when trying to get scrollHeight.')
+        // 备选方案：尝试滚动到一个非常大的数，确保到底部
+        scrollbar.scrollTo({ top: 999999, behavior: 'smooth' })
+        console.warn('Falling back to scrollTo a large number.')
+      }
+    } else {
+      console.warn('Scrollbar instance or scrollTo method not found.')
+    }
+  })
 }
 
 // 监听消息变化，自动渲染 Markdown
@@ -113,13 +130,14 @@ watch(
 // 监听渲染后的消息变化，自动滚动到底部
 watch(
   renderedMessages,
-  (newRenderedMessages) => {
-    console.log('renderedMessages 更新，准备滚动到底部:', newRenderedMessages)
-    nextTick(() => {
+  (newRenderedMessages, oldRenderedMessages) => {
+    // 仅在消息列表实际增加（通常是新消息）时滚动
+    if (newRenderedMessages.length > oldRenderedMessages?.length) {
+      console.log('Rendered messages updated, scrolling to bottom.')
       scrollToBottom()
-    })
+    }
   },
-  { deep: true }, // 添加 deep 选项
+  { deep: true },
 )
 
 // 聊天配置
@@ -203,6 +221,7 @@ const loadMoreMessages = async () => {
   if (currentPage.value >= totalPages.value || messagesLoading.value) return
   currentPage.value++
   messagesLoading.value = true
+  console.log(`Loading more messages, page: ${currentPage.value}`)
 
   try {
     const response = await getSessionHistoryAPI(currentSession.value._id, {
@@ -210,8 +229,23 @@ const loadMoreMessages = async () => {
       page_size: pageSize.value,
     })
 
+    const scrollbar = scrollbarRef.value?.wrap
+    const oldScrollHeight = scrollbar?.scrollHeight || 0
+
     // 将新消息添加到数组前面
     messages.value = [...response.items, ...messages.value]
+
+    // 等待 DOM 更新后恢复滚动位置
+    nextTick(() => {
+      if (scrollbar) {
+        const newScrollHeight = scrollbar.scrollHeight
+        scrollbar.scrollTop =
+          newScrollHeight - oldScrollHeight + (scrollbar.scrollTop || 0) // 尝试保持位置
+        console.log(
+          `Messages loaded. Old height: ${oldScrollHeight}, New height: ${newScrollHeight}, Restored scrollTop: ${scrollbar.scrollTop}`,
+        )
+      }
+    })
   } catch (error) {
     currentPage.value-- // 恢复页码
     console.error('加载更多消息失败:', error)
@@ -221,16 +255,17 @@ const loadMoreMessages = async () => {
   }
 }
 
-// 处理滚动事件
-const handleScroll = (e) => {
-  const { scrollTop } = e.target
-  // 当滚动到顶部时加载更多消息
-  if (scrollTop === 0 && !messagesLoading.value && currentPage.value < totalPages.value) {
+// 处理滚动事件 - 修改签名和条件
+const handleScroll = ({ scrollTop }) => {
+  // console.log('Scroll event detected, scrollTop:', scrollTop) // 调试时可以取消注释
+  // 当滚动到接近顶部时加载更多消息
+  if (scrollTop < 10 && !messagesLoading.value && currentPage.value < totalPages.value) {
+    console.log('Scrolled near top, loading more messages...')
     loadMoreMessages()
   }
 }
 
-// 修改发送消息函数，确保新消息显示在底部
+// 修改发送消息函数，移除冗余的 scrollToBottom 调用
 const sendMessage = async () => {
   if (!OneapiStore.selectedModel) {
     ElMessage.info('请先选择一个模型')
@@ -248,12 +283,12 @@ const sendMessage = async () => {
     content: inputMessage.value,
   }
   messages.value.push(userMessage)
-  console.log('messages.value:', messages.value)
+  console.log('messages.value pushed:', userMessage)
   const messagePayload = chat.value
   const currentInput = inputMessage.value
   inputMessage.value = ''
 
-  console.log('发送消息:', messagePayload)
+  console.log('Sending message payload:', messagePayload)
 
   try {
     const answer = await sayHelloAPI(messagePayload)
@@ -262,12 +297,10 @@ const sendMessage = async () => {
       type: 'ai',
       content: answer,
     })
-    nextTick(() => {
-      scrollToBottom()
-    })
   } catch (error) {
     ElMessage.error('发送消息失败')
     console.error('发送消息 API 调用失败:', error)
+    // 失败时恢复输入框内容
     messages.value = messages.value.filter((m) => m.id !== userMessage.id)
     inputMessage.value = currentInput
   }
@@ -516,15 +549,8 @@ const handleDeleteSession = async (session) => {
     <div class="chat-main">
       <template v-if="currentSession">
         <!-- 聊天记录 -->
-        <div class="chat-messages" @scroll="handleScroll" v-loading="messagesLoading">
-          <!-- 加载更多按钮 -->
-          <div v-if="currentPage < totalPages" class="load-more">
-            <el-button :loading="messagesLoading" @click="loadMoreMessages" text>
-              加载更多
-            </el-button>
-          </div>
-
-          <el-scrollbar height="100%" ref="scrollbarRef">
+        <div class="chat-messages" v-loading="messagesLoading">
+          <el-scrollbar height="100%" ref="scrollbarRef" @scroll="handleScroll">
             <div class="messages-container">
               <transition-group name="message-fade">
                 <div
@@ -929,11 +955,6 @@ const handleDeleteSession = async (session) => {
       scrollbar-width: none; /* Firefox */
       &::-webkit-scrollbar {
         display: none; /* Chrome/Safari/Edge */
-      }
-
-      .load-more {
-        text-align: center;
-        padding: 0;
       }
 
       .messages-container {
