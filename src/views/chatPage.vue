@@ -1,12 +1,14 @@
 <script setup>
 // chatPage.vue script部分
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Plus, Delete, Setting, MoreFilled, Edit } from '@element-plus/icons-vue'
 import { ElMessage, ElEmpty, ElMessageBox } from 'element-plus'
 import { sayHelloAPI } from '@/api/chatAPI'
+import { getSessionHistoryAPI } from '@/api/sessionAPI'
 import { oneapiModelListStore, useAuthStore } from '@/stores'
 import { useAssistantStore } from '@/stores/modules/assistant'
 import { useSessionStore } from '@/stores/modules/session'
+import { renderMarkdown } from '@/utils/markdown'
 import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
 import EditSessionDialog from '@/components/EditSessionDialog.vue'
@@ -56,13 +58,71 @@ const handleSelectModel = (modelId) => {
 
 // 当前选中的助手和话题
 const currentAssistant = computed(() => assistantStore.getCurrentAssistant)
-const currentTopic = computed(() => sessionStore.getCurrentSession)
+const currentSession = computed(() => sessionStore.getCurrentSession)
 
 // 聊天消息
 const messages = ref([])
 // 输入框内容
 const inputMessage = ref('')
+// 消息加载状态
+const messagesLoading = ref(false)
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(5)
+const totalPages = ref(0)
+// 消息渲染相关
+const renderedMessages = ref([])
+const scrollbarRef = ref(null)
 
+// 滚动到底部
+const scrollToBottom = () => {
+  if (scrollbarRef.value?.wrap) {
+    const { wrap } = scrollbarRef.value
+    wrap.scrollTop = wrap.scrollHeight
+  }
+}
+
+// 监听消息变化，自动渲染 Markdown
+watch(
+  messages,
+  async (newMessages) => {
+    console.log('消息列表发生变化，开始渲染:', newMessages)
+    try {
+      renderedMessages.value = await Promise.all(
+        newMessages.map(async (msg) => {
+          console.log('正在渲染消息:', msg)
+          return {
+            ...msg,
+            renderedContent: await renderMarkdown(msg.content),
+          }
+        }),
+      )
+      console.log('渲染完成，更新后的 renderedMessages:', renderedMessages.value)
+    } catch (error) {
+      console.error('渲染消息时出错:', error)
+      // 确保即使渲染失败也能显示原始消息
+      renderedMessages.value = newMessages.map((msg) => ({
+        ...msg,
+        renderedContent: msg.content,
+      }))
+    }
+  },
+  { deep: true, immediate: true },
+)
+
+// 监听渲染后的消息变化，自动滚动到底部
+watch(
+  renderedMessages,
+  (newRenderedMessages) => {
+    console.log('renderedMessages 更新，准备滚动到底部:', newRenderedMessages)
+    nextTick(() => {
+      scrollToBottom()
+    })
+  },
+  { deep: true }, // 添加 deep 选项
+)
+
+// 聊天配置
 const chat_config = ref({
   chat_history_max_length: 5,
   temperature: 0.8,
@@ -71,17 +131,17 @@ const chat_config = ref({
 //   embedding_supplier: 'ollama',
 // })
 
-// 修改 llm_config 为计算属性
+// llm 模型配置
 const llm_config = computed(() => ({
   supplier: 'oneapi',
-  model: OneapiStore.selectedModel || '',
+  model: OneapiStore.selectedModel,
   api_key: OneapiStore.selectedToken?.key ? `sk-${OneapiStore.selectedToken.key}` : '',
 }))
 
 // 修改 chat 计算属性，确保使用新的 llm_config
 const chat = computed(() => ({
   question: inputMessage.value,
-  session_id: currentTopic.value?._id,
+  session_id: currentSession.value?._id,
   chat_config: chat_config.value,
   llm_config: llm_config.value,
 }))
@@ -95,9 +155,7 @@ const topics = computed(() => sessionStore.getSessionsList)
 
 // 选择助手
 const handleSelectAssistant = async (assistant) => {
-  console.log('选择助手，传入的助手对象:', assistant)
   assistantStore.selectAssistant(assistant)
-  console.log('选择后的 currentAssistant:', assistantStore.currentAssistant)
 
   // 立即加载该助手的会话列表
   if (assistant && assistant._id) {
@@ -115,27 +173,70 @@ const handleSelectSession = (session) => {
 }
 
 // 加载消息记录
-const loadMessages = () => {
-  if (currentTopic.value) {
-    messages.value = [
-      {
-        id: 1,
-        type: 'assistant',
-        content: '你好！有什么可以帮你的吗？',
-      },
-    ]
-  } else {
+const loadMessages = async () => {
+  if (!currentSession.value?._id) {
     messages.value = []
+    return
+  }
+
+  messagesLoading.value = true
+  try {
+    const response = await getSessionHistoryAPI(currentSession.value._id, {
+      page: currentPage.value,
+      page_size: pageSize.value,
+    })
+
+    // 更新分页信息、消息列表
+    totalPages.value = response.total_pages
+    messages.value = response.items
+  } catch (error) {
+    console.error('加载消息记录失败:', error)
+    ElMessage.error('加载消息记录失败')
+    messages.value = []
+  } finally {
+    messagesLoading.value = false
   }
 }
 
-// 发送消息
+// 加载更多历史消息
+const loadMoreMessages = async () => {
+  if (currentPage.value >= totalPages.value || messagesLoading.value) return
+  currentPage.value++
+  messagesLoading.value = true
+
+  try {
+    const response = await getSessionHistoryAPI(currentSession.value._id, {
+      page: currentPage.value,
+      page_size: pageSize.value,
+    })
+
+    // 将新消息添加到数组前面
+    messages.value = [...response.items, ...messages.value]
+  } catch (error) {
+    currentPage.value-- // 恢复页码
+    console.error('加载更多消息失败:', error)
+    ElMessage.error('加载更多消息失败')
+  } finally {
+    messagesLoading.value = false
+  }
+}
+
+// 处理滚动事件
+const handleScroll = (e) => {
+  const { scrollTop } = e.target
+  // 当滚动到顶部时加载更多消息
+  if (scrollTop === 0 && !messagesLoading.value && currentPage.value < totalPages.value) {
+    loadMoreMessages()
+  }
+}
+
+// 修改发送消息函数，确保新消息显示在底部
 const sendMessage = async () => {
   if (!OneapiStore.selectedModel) {
     ElMessage.info('请先选择一个模型')
     return
   }
-  if (!currentTopic.value) {
+  if (!currentSession.value) {
     ElMessage.info('请先选择一个话题')
     return
   }
@@ -143,11 +244,11 @@ const sendMessage = async () => {
 
   const userMessage = {
     id: Date.now(),
-    type: 'user',
+    type: 'human',
     content: inputMessage.value,
   }
   messages.value.push(userMessage)
-
+  console.log('messages.value:', messages.value)
   const messagePayload = chat.value
   const currentInput = inputMessage.value
   inputMessage.value = ''
@@ -158,8 +259,11 @@ const sendMessage = async () => {
     const answer = await sayHelloAPI(messagePayload)
     messages.value.push({
       id: Date.now() + 1,
-      type: 'assistant',
+      type: 'ai',
       content: answer,
+    })
+    nextTick(() => {
+      scrollToBottom()
     })
   } catch (error) {
     ElMessage.error('发送消息失败')
@@ -169,14 +273,14 @@ const sendMessage = async () => {
   }
 }
 
-// 新增：控制创建助手对话框
+// 控制创建助手对话框
 const showCreateAssistantDialog = ref(false)
 
 const handleCreateAssistantConfirm = (assistantData) => {
   assistantStore.createAssistant(assistantData)
 }
 
-// 新增：监听当前助手的变化，以加载会话列表
+// 监听当前助手的变化，以加载会话列表
 watch(
   () => assistantStore.currentAssistant,
   async (newAssistant) => {
@@ -194,7 +298,7 @@ watch(
   { immediate: true }, // 添加 immediate: true，确保组件挂载时就执行一次
 )
 
-// 新增：监听当前会话变化，用于调试或触发其他逻辑
+// 监听当前会话变化，用于调试或触发其他逻辑
 watch(
   () => sessionStore.currentSession,
   (newSession) => {
@@ -208,12 +312,12 @@ watch(
   },
 )
 
-// 新增：打开创建助手对话框
+// 打开创建助手对话框
 const openCreateAssistantDialog = () => {
   showCreateAssistantDialog.value = true
 }
 
-// 新增：创建新会话
+// 创建新会话
 const handleCreateSession = () => {
   sessionStore.createSession()
 }
@@ -369,7 +473,7 @@ const handleDeleteSession = async (session) => {
                 v-for="topic in topics"
                 :key="topic._id"
                 class="list-item"
-                :class="{ active: currentTopic?._id === topic._id }"
+                :class="{ active: currentSession?._id === topic._id }"
                 @click="handleSelectSession(topic)"
               >
                 <div class="topic-info">
@@ -410,17 +514,33 @@ const handleDeleteSession = async (session) => {
 
     <!-- 右侧聊天区域 -->
     <div class="chat-main">
-      <template v-if="currentTopic">
+      <template v-if="currentSession">
         <!-- 聊天记录 -->
-        <div class="chat-messages">
-          <div
-            v-for="message in messages"
-            :key="message.id"
-            class="message"
-            :class="message.type"
-          >
-            <div class="message-content">{{ message.content }}</div>
+        <div class="chat-messages" @scroll="handleScroll" v-loading="messagesLoading">
+          <!-- 加载更多按钮 -->
+          <div v-if="currentPage < totalPages" class="load-more">
+            <el-button :loading="messagesLoading" @click="loadMoreMessages" text>
+              加载更多
+            </el-button>
           </div>
+
+          <el-scrollbar height="100%" ref="scrollbarRef">
+            <div class="messages-container">
+              <transition-group name="message-fade">
+                <div
+                  v-for="message in renderedMessages"
+                  :key="message.id"
+                  class="message"
+                  :class="message.type"
+                >
+                  <div
+                    class="message-content markdown-body"
+                    v-html="message.renderedContent"
+                  ></div>
+                </div>
+              </transition-group>
+            </div>
+          </el-scrollbar>
         </div>
 
         <!-- 输入框区域 -->
@@ -584,6 +704,112 @@ const handleDeleteSession = async (session) => {
     }
   }
 }
+
+/* 移除 scoped，使样式可以影响 v-html 内容 */
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.6;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  p {
+    margin: 0.5em 0;
+  }
+
+  code {
+    padding: 0.2em 0.4em;
+    margin: 0;
+    font-size: 85%;
+    background-color: rgba(175, 184, 193, 0.2);
+    border-radius: 6px;
+    font-family:
+      ui-monospace,
+      SFMono-Regular,
+      SF Mono,
+      Menlo,
+      Consolas,
+      Liberation Mono,
+      monospace;
+  }
+
+  pre {
+    padding: 16px;
+    overflow: auto;
+    line-height: 1.45;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    margin: 0.5em 0;
+
+    code {
+      padding: 0;
+      margin: 0;
+      font-size: 1em;
+      background-color: transparent;
+      border: 0;
+      white-space: pre;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+  }
+
+  ul,
+  ol {
+    padding-left: 2em;
+    margin: 0.5em 0;
+  }
+
+  li {
+    margin: 0.25em 0;
+  }
+
+  blockquote {
+    padding: 0 1em;
+    color: #656d76;
+    border-left: 0.25em solid #d0d7de;
+    margin: 0.5em 0;
+  }
+
+  table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    width: 100%;
+
+    th,
+    td {
+      padding: 6px 13px;
+      border: 1px solid #d0d7de;
+    }
+
+    tr:nth-child(2n) {
+      background-color: #f6f8fa;
+    }
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  a {
+    color: #0969da;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
 </style>
 
 <style lang="scss" scoped>
@@ -705,11 +931,20 @@ const handleDeleteSession = async (session) => {
         display: none; /* Chrome/Safari/Edge */
       }
 
+      .load-more {
+        text-align: center;
+        padding: 0;
+      }
+
+      .messages-container {
+        min-height: 100%;
+      }
+
       .message {
         // message 的基础样式
         display: flex;
         margin-bottom: 20px;
-        max-width: 80%; // 移动 max-width 到这里更合适
+        max-width: 80%;
 
         .message-content {
           padding: 12px 16px;
@@ -719,7 +954,7 @@ const handleDeleteSession = async (session) => {
         }
 
         // 用户消息特定样式
-        &.user {
+        &.human {
           justify-content: flex-end; // 移到这里
           margin-left: auto; // 推到右边
 
@@ -733,7 +968,7 @@ const handleDeleteSession = async (session) => {
         }
 
         // 助手消息特定样式
-        &.assistant {
+        &.ai {
           margin-right: auto; // 推到左边
           .message-content {
             background-color: #fff;
@@ -743,6 +978,17 @@ const handleDeleteSession = async (session) => {
               -2px -2px 4px rgba(255, 255, 255, 0.8);
           }
         }
+      }
+
+      // 消息过渡动画
+      .message-fade-enter-active,
+      .message-fade-leave-active {
+        transition: all 0.3s ease;
+      }
+      .message-fade-enter-from,
+      .message-fade-leave-to {
+        opacity: 0;
+        transform: translateY(20px);
       }
     }
 

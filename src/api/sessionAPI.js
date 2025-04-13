@@ -42,3 +42,31 @@ export const updateSessionTitleAPI = (sessionId, params) => {
 export const deleteSessionAPI = (sessionId) => {
   return request.delete(`/session/${sessionId}/delete`)
 }
+
+/**
+ * 分页获取会话的历史消息记录
+ * @param {string} sessionId - 会话 ID
+ * @param {object} params - 查询参数
+ * @param {number} [params.page=1] - 页码，从1开始
+ * @param {number} [params.page_size=10] - 每页消息数量
+ * @returns {Promise<{
+ *   page: number,
+ *   size: number,
+ *   total_pages: number,
+ *   total_items: number,
+ *   items: Array<{
+ *     type: "ai" | "human",
+ *     content: string
+ *   }>
+ * }>} 返回一个 Promise 对象，包含分页信息和消息列表
+ * @throws {Error} 当会话 ID 格式无效或服务器内部错误时抛出异常
+ */
+export const getSessionHistoryAPI = (sessionId, params = {}) => {
+  const defaultParams = {
+    page: 1,
+    page_size: 10,
+  }
+  // 合并默认参数和传入的参数
+  const queryParams = { ...defaultParams, ...params }
+  return request.get(`/session/${sessionId}/history`, { params: queryParams })
+}

@@ -14,7 +14,7 @@ export const oneapiModelListStore = defineStore(
     const selectedModel = ref(null) // 当前选中的模型
     const loading = ref(false) // 加载状态
     const error = ref(null) // 错误信息
-    // 新增：存储原始配额数据
+    // 存储原始配额数据
     const accountQuota = ref(0) // 用户总配额
     const accountUsedQuota = ref(0) // 用户已用配额
 

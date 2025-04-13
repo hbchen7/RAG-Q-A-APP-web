@@ -79,7 +79,7 @@ const handleLogout = () => {
               <el-avatar :size="60" :src="userInfo.avatar" />
               <h3>{{ userInfo.username }}</h3>
 
-              <!-- 新增：配额信息显示区域 -->
+              <!-- 配额信息显示区域 -->
               <div class="quota-info">
                 <div class="quota-text">
                   <span>已用: {{ usedQuotaDollars }}</span>
