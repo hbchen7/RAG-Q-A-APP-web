@@ -20,16 +20,9 @@ const sessionStore = useSessionStore()
 // 在组件挂载时初始化
 onMounted(async () => {
   OneapiStore.init()
-  console.log('组件挂载前的 currentAssistant:', assistantStore.currentAssistant)
-
-  // 获取助手列表
   await assistantStore.fetchAssistantList()
-  console.log('获取列表后的 currentAssistant:', assistantStore.currentAssistant)
-
-  // 如果有当前选中的助手，加载其会话列表
   const currentAssistant = assistantStore.currentAssistant
   if (currentAssistant && currentAssistant._id) {
-    console.log('初始化时加载当前助手的会话列表...')
     await sessionStore.fetchSessionList(currentAssistant._id)
   }
 })
@@ -74,50 +67,43 @@ const totalPages = ref(0)
 const renderedMessages = ref([])
 const scrollbarRef = ref(null)
 
-// 滚动到底部 - 使用 scrollTo 方法
+// 滚动到底部 - 移除日志
 const scrollToBottom = () => {
   nextTick(() => {
     const scrollbar = scrollbarRef.value
-    console.log('Attempting to scroll to bottom. Scrollbar ref:', scrollbar)
     if (scrollbar && typeof scrollbar.scrollTo === 'function') {
-      // 获取 scrollHeight 可能仍然需要 wrap
-      const wrap = scrollbar.wrapRef // Element Plus 内部可能使用 wrapRef
+      const wrap = scrollbar.wrapRef
       if (wrap) {
         const scrollHeight = wrap.scrollHeight
-        console.log('Scrollbar wrap found. scrollHeight:', scrollHeight)
-        scrollbar.scrollTo({ top: scrollHeight, behavior: 'smooth' }) // 使用 scrollTo 方法并添加平滑滚动
-        console.log('Called scrollbar.scrollTo({ top:', scrollHeight, '})')
+        scrollbar.scrollTo({ top: scrollHeight, behavior: 'smooth' })
       } else {
+        // 保留警告日志
         console.warn('Scrollbar wrapRef not found when trying to get scrollHeight.')
-        // 备选方案：尝试滚动到一个非常大的数，确保到底部
         scrollbar.scrollTo({ top: 999999, behavior: 'smooth' })
         console.warn('Falling back to scrollTo a large number.')
       }
     } else {
+      // 保留警告日志
       console.warn('Scrollbar instance or scrollTo method not found.')
     }
   })
 }
 
-// 监听消息变化，自动渲染 Markdown
+// 监听消息变化，自动渲染 Markdown - 移除日志
 watch(
   messages,
   async (newMessages) => {
-    console.log('消息列表发生变化，开始渲染:', newMessages)
     try {
       renderedMessages.value = await Promise.all(
         newMessages.map(async (msg) => {
-          console.log('正在渲染消息:', msg)
           return {
             ...msg,
             renderedContent: await renderMarkdown(msg.content),
           }
         }),
       )
-      console.log('渲染完成，更新后的 renderedMessages:', renderedMessages.value)
     } catch (error) {
       console.error('渲染消息时出错:', error)
-      // 确保即使渲染失败也能显示原始消息
       renderedMessages.value = newMessages.map((msg) => ({
         ...msg,
         renderedContent: msg.content,
@@ -127,13 +113,11 @@ watch(
   { deep: true, immediate: true },
 )
 
-// 监听渲染后的消息变化，自动滚动到底部
+// 监听渲染后的消息变化，自动滚动到底部 - 移除日志
 watch(
   renderedMessages,
   (newRenderedMessages, oldRenderedMessages) => {
-    // 仅在消息列表实际增加（通常是新消息）时滚动
     if (newRenderedMessages.length > oldRenderedMessages?.length) {
-      console.log('Rendered messages updated, scrolling to bottom.')
       scrollToBottom()
     }
   },
@@ -159,6 +143,7 @@ const llm_config = computed(() => ({
 // 修改 chat 计算属性，确保使用新的 llm_config
 const chat = computed(() => ({
   question: inputMessage.value,
+  prompt: assistantStore.currentAssistant.prompt,
   session_id: currentSession.value?._id,
   chat_config: chat_config.value,
   llm_config: llm_config.value,
@@ -190,21 +175,18 @@ const handleSelectSession = (session) => {
   loadMessages()
 }
 
-// 加载消息记录
+// 加载消息记录 - 保留原有错误日志
 const loadMessages = async () => {
   if (!currentSession.value?._id) {
     messages.value = []
     return
   }
-
   messagesLoading.value = true
   try {
     const response = await getSessionHistoryAPI(currentSession.value._id, {
       page: currentPage.value,
       page_size: pageSize.value,
     })
-
-    // 更新分页信息、消息列表
     totalPages.value = response.total_pages
     messages.value = response.items
   } catch (error) {
@@ -216,12 +198,11 @@ const loadMessages = async () => {
   }
 }
 
-// 加载更多历史消息
+// 加载更多历史消息 - 移除日志
 const loadMoreMessages = async () => {
   if (currentPage.value >= totalPages.value || messagesLoading.value) return
   currentPage.value++
   messagesLoading.value = true
-  console.log(`Loading more messages, page: ${currentPage.value}`)
 
   try {
     const response = await getSessionHistoryAPI(currentSession.value._id, {
@@ -232,22 +213,17 @@ const loadMoreMessages = async () => {
     const scrollbar = scrollbarRef.value?.wrap
     const oldScrollHeight = scrollbar?.scrollHeight || 0
 
-    // 将新消息添加到数组前面
     messages.value = [...response.items, ...messages.value]
 
-    // 等待 DOM 更新后恢复滚动位置
     nextTick(() => {
       if (scrollbar) {
         const newScrollHeight = scrollbar.scrollHeight
         scrollbar.scrollTop =
-          newScrollHeight - oldScrollHeight + (scrollbar.scrollTop || 0) // 尝试保持位置
-        console.log(
-          `Messages loaded. Old height: ${oldScrollHeight}, New height: ${newScrollHeight}, Restored scrollTop: ${scrollbar.scrollTop}`,
-        )
+          newScrollHeight - oldScrollHeight + (scrollbar.scrollTop || 0)
       }
     })
   } catch (error) {
-    currentPage.value-- // 恢复页码
+    currentPage.value--
     console.error('加载更多消息失败:', error)
     ElMessage.error('加载更多消息失败')
   } finally {
@@ -255,17 +231,14 @@ const loadMoreMessages = async () => {
   }
 }
 
-// 处理滚动事件 - 修改签名和条件
+// 处理滚动事件 - 移除日志
 const handleScroll = ({ scrollTop }) => {
-  // console.log('Scroll event detected, scrollTop:', scrollTop) // 调试时可以取消注释
-  // 当滚动到接近顶部时加载更多消息
   if (scrollTop < 10 && !messagesLoading.value && currentPage.value < totalPages.value) {
-    console.log('Scrolled near top, loading more messages...')
     loadMoreMessages()
   }
 }
 
-// 修改发送消息函数，移除冗余的 scrollToBottom 调用
+// 发送消息函数 - 移除日志
 const sendMessage = async () => {
   if (!OneapiStore.selectedModel) {
     ElMessage.info('请先选择一个模型')
@@ -283,14 +256,12 @@ const sendMessage = async () => {
     content: inputMessage.value,
   }
   messages.value.push(userMessage)
-  console.log('messages.value pushed:', userMessage)
   const messagePayload = chat.value
   const currentInput = inputMessage.value
   inputMessage.value = ''
 
-  console.log('Sending message payload:', messagePayload)
-
   try {
+    console.log('发送消息 payload:', messagePayload)
     const answer = await sayHelloAPI(messagePayload)
     messages.value.push({
       id: Date.now() + 1,
@@ -300,7 +271,6 @@ const sendMessage = async () => {
   } catch (error) {
     ElMessage.error('发送消息失败')
     console.error('发送消息 API 调用失败:', error)
-    // 失败时恢复输入框内容
     messages.value = messages.value.filter((m) => m.id !== userMessage.id)
     inputMessage.value = currentInput
   }
@@ -318,31 +288,13 @@ watch(
   () => assistantStore.currentAssistant,
   async (newAssistant) => {
     if (newAssistant && newAssistant._id) {
-      console.log(
-        `当前助手切换为: ${newAssistant.title || newAssistant.name} (ID: ${newAssistant._id}), 准备加载会话列表...`,
-      )
       await sessionStore.fetchSessionList(newAssistant._id)
     } else {
-      console.log('当前没有选中助手，清空会话列表。')
       sessionStore.sessionsList = []
       sessionStore.currentSession = null
     }
   },
   { immediate: true }, // 添加 immediate: true，确保组件挂载时就执行一次
-)
-
-// 监听当前会话变化，用于调试或触发其他逻辑
-watch(
-  () => sessionStore.currentSession,
-  (newSession) => {
-    if (newSession) {
-      console.log(`当前会话切换为: ${newSession.name} (ID: ${newSession.id})`)
-      loadMessages()
-    } else {
-      console.log('当前没有选中会话。')
-      messages.value = []
-    }
-  },
 )
 
 // 打开创建助手对话框
