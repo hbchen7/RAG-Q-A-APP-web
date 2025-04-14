@@ -268,11 +268,11 @@ const sendMessage = async () => {
 
   try {
     console.log('发送消息 payload:', messagePayload)
-    const answer = await sayHelloAPI(messagePayload)
+    const response = await sayHelloAPI(messagePayload)
     messages.value.push({
       id: Date.now() + 1,
       type: 'ai',
-      content: answer,
+      content: response.answer,
     })
   } catch (error) {
     ElMessage.error('发送消息失败')
