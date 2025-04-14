@@ -127,26 +127,32 @@ watch(
 // 聊天配置
 const chat_config = ref({
   chat_history_max_length: 5,
-  temperature: 0.8,
+  prompt_override: assistantStore.currentAssistant.prompt,
 })
-// const knowledge_config = ref({
-//   embedding_supplier: 'ollama',
-// })
-
 // llm 模型配置
 const llm_config = computed(() => ({
   supplier: 'oneapi',
   model: OneapiStore.selectedModel,
   api_key: OneapiStore.selectedToken?.key ? `sk-${OneapiStore.selectedToken.key}` : '',
+  temperature: 0.8,
 }))
+// 知识库配置
+const knowledge_config = ref({
+  knowledge_base_id: '67fcc49a061ef4d17e38e81b',
+  embedding_supplier: 'oneapi',
+  embedding_model: 'BAAI/bge-m3',
+  embedding_api_key: OneapiStore.selectedToken?.key
+    ? `sk-${OneapiStore.selectedToken.key}`
+    : '',
+})
 
 // 修改 chat 计算属性，确保使用新的 llm_config
 const chat = computed(() => ({
   question: inputMessage.value,
-  prompt: assistantStore.currentAssistant.prompt,
   session_id: currentSession.value?._id,
   chat_config: chat_config.value,
   llm_config: llm_config.value,
+  knowledge_config: knowledge_config.value,
 }))
 
 // 选项卡激活项
