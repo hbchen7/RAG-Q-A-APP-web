@@ -139,6 +139,8 @@ const llm_config = computed(() => ({
 // 知识库配置
 const knowledge_config = ref({
   knowledge_base_id: '67fcc49a061ef4d17e38e81b',
+  // filter_by_file_md5: 'a732ad338b1b9c01e1757e934526f35c',
+  search_k: 3,
   embedding_supplier: 'oneapi',
   embedding_model: 'BAAI/bge-m3',
   embedding_api_key: OneapiStore.selectedToken?.key
