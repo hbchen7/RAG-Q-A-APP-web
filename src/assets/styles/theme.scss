@@ -14,6 +14,20 @@ $primary-active: #e4eaf1;
 $text-primary: #333;
 $text-secondary: #999;
 
+// 覆盖 Element Plus 的 CSS 变量
+:root {
+  --el-color-primary: #{$primary-color}; // 使用 Sass 变量设置 Element Plus 主色 CSS 变量
+
+  // 可选：覆盖其他相关的 Element Plus 颜色变量以保持一致性
+  // 例如，如果你希望 hover、active、disabled 状态的颜色也基于新的主色调生成，
+  // 你可能需要覆盖 --el-color-primary-light-3, --el-color-primary-light-5,
+  // --el-color-primary-light-7, --el-color-primary-light-8, --el-color-primary-light-9,
+  // --el-color-primary-dark-2 等。
+  // 一个简单的例子 (可以使用 Sass 的颜色函数如 mix(), lighten(), darken() 来生成):
+  // --el-color-primary-light-3: mix(white, $primary-color, 30%); // 示例：生成浅色
+  // --el-color-primary-dark-2: mix(black, $primary-color, 20%); // 示例：生成深色
+}
+
 // 阴影变量
 $box-shadow-outer-m://外凸效果
   2px 2px 4px rgba(0, 0, 0, 0.05),

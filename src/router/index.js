@@ -24,7 +24,7 @@ const router = createRouter({
         {
           path: 'library',
           name: 'library',
-          component: () => import('@/views/LibraryPage.vue'),
+          component: () => import('@/views/KnowledgeBase.vue'),
         },
 
         {

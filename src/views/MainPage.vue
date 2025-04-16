@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
 import { ElProgress } from 'element-plus'
 import { useAuthStore, oneapiModelListStore } from '@/stores'
+import userAvatar from '@/assets/ic_user.jpg' // 导入用户头像图片
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -14,7 +15,7 @@ const showUserCard = ref(false)
 
 // 用户信息
 const userInfo = ref({
-  avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+  avatar: userAvatar, // 使用导入的头像变量
   username: auth.user.username,
 })
 

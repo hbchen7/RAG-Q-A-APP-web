@@ -127,7 +127,7 @@ watch(
 // 聊天配置
 const chat_config = ref({
   chat_history_max_length: 5,
-  prompt_override: assistantStore.currentAssistant.prompt,
+  prompt_override: assistantStore.currentAssistant?.prompt || '',
 })
 // llm 模型配置
 const llm_config = computed(() => ({
