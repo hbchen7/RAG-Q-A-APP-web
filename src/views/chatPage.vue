@@ -1,13 +1,21 @@
 <script setup>
 // chatPage.vue script部分
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { Plus, Delete, Setting, MoreFilled, Edit } from '@element-plus/icons-vue'
+import {
+  Plus,
+  Delete,
+  Setting,
+  MoreFilled,
+  Edit,
+  Collection,
+} from '@element-plus/icons-vue'
 import { ElMessage, ElEmpty, ElMessageBox } from 'element-plus'
 import { sayHelloAPI } from '@/api/chatAPI'
 import { getSessionHistoryAPI } from '@/api/sessionAPI'
 import { oneapiModelListStore, useAuthStore } from '@/stores'
 import { useAssistantStore } from '@/stores/modules/assistant'
 import { useSessionStore } from '@/stores/modules/session'
+import { useKnowledgeStore } from '@/stores/modules/knowledge'
 import { renderMarkdown } from '@/utils/markdown'
 import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
@@ -16,11 +24,13 @@ import EditSessionDialog from '@/components/EditSessionDialog.vue'
 const OneapiStore = oneapiModelListStore()
 const assistantStore = useAssistantStore()
 const sessionStore = useSessionStore()
+const knowledgeStore = useKnowledgeStore()
 
 // 在组件挂载时初始化
 onMounted(async () => {
   OneapiStore.init()
   await assistantStore.fetchAssistantList()
+  await knowledgeStore.fetchKnowledgeBases()
   const currentAssistant = assistantStore.currentAssistant
   if (currentAssistant && currentAssistant._id) {
     await sessionStore.fetchSessionList(currentAssistant._id)
@@ -38,6 +48,16 @@ const selectedTokenName = computed(() => OneapiStore.selectedToken?.name || '选
 // 计算属性：当前选中的模型名称
 const selectedModelName = computed(() => OneapiStore.selectedModel || '选择模型')
 
+// 计算属性：当前选中的知识库名称
+const selectedKnowledgeBaseName = computed(() =>
+  knowledgeStore.KBtoChat ? knowledgeStore.KBtoChat.title : '不使用知识库',
+)
+
+// 计算属性：当前选中的文件名称
+const selectedFileName = computed(() =>
+  knowledgeStore.FileToChat ? knowledgeStore.FileToChat.file_name : '文件全选',
+)
+
 // 处理令牌选择
 const handleSelectToken = (token) => {
   OneapiStore.selectToken(token)
@@ -47,6 +67,24 @@ const handleSelectToken = (token) => {
 const handleSelectModel = (modelId) => {
   OneapiStore.selectModel(modelId)
   ElMessage.success(`已切换到模型: ${modelId}`)
+}
+
+// 处理知识库选择
+const handleSelectKnowledgeBase = (kb) => {
+  if (!kb) {
+    knowledgeStore.clearChatKnowledgeBase()
+    return
+  }
+  knowledgeStore.setChatKnowledgeBase(kb)
+}
+
+// 处理文件选择
+const handleSelectFile = (file) => {
+  if (!file) {
+    knowledgeStore.setChatFile(null)
+    return
+  }
+  knowledgeStore.setChatFile(file)
 }
 
 // 当前选中的助手和话题
@@ -67,7 +105,7 @@ const totalPages = ref(0)
 const renderedMessages = ref([])
 const scrollbarRef = ref(null)
 
-// 滚动到底部 - 移除日志
+// 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
     const scrollbar = scrollbarRef.value
@@ -89,7 +127,7 @@ const scrollToBottom = () => {
   })
 }
 
-// 监听消息变化，自动渲染 Markdown - 移除日志
+// 监听消息变化，自动渲染 Markdown
 watch(
   messages,
   async (newMessages) => {
@@ -113,7 +151,7 @@ watch(
   { deep: true, immediate: true },
 )
 
-// 监听渲染后的消息变化，自动滚动到底部 - 移除日志
+// 监听渲染后的消息变化，自动滚动到底部
 watch(
   renderedMessages,
   (newRenderedMessages, oldRenderedMessages) => {
@@ -137,30 +175,53 @@ const llm_config = computed(() => ({
   temperature: 0.8,
 }))
 // 知识库配置
-const knowledge_config = ref({
-  knowledge_base_id: '67fcc49a061ef4d17e38e81b',
-  // filter_by_file_md5: 'a732ad338b1b9c01e1757e934526f35c',
-  search_k: 3,
-  embedding_supplier: 'oneapi',
-  embedding_model: 'BAAI/bge-m3',
-  embedding_api_key: OneapiStore.selectedToken?.key
-    ? `sk-${OneapiStore.selectedToken.key}`
-    : '',
-})
+const knowledge_config = ref(null) // 初始值设为 null
 
-// 修改 chat 计算属性，确保使用新的 llm_config
-const chat = computed(() => ({
-  question: inputMessage.value,
-  session_id: currentSession.value?._id,
-  chat_config: chat_config.value,
-  llm_config: llm_config.value,
-  knowledge_config: knowledge_config.value,
-}))
+// 监听 KBtoChat 和 FileToChat 的变化，更新 knowledge_config
+watch(
+  [() => knowledgeStore.KBtoChat, () => knowledgeStore.FileToChat],
+  ([newKB, newFile]) => {
+    if (!newKB) {
+      knowledge_config.value = null
+    } else {
+      knowledge_config.value = {
+        knowledge_base_id: newKB._id,
+        search_k: 3,
+        embedding_supplier: 'oneapi',
+        embedding_model: 'BAAI/bge-m3',
+        embedding_api_key: OneapiStore.selectedToken?.key
+          ? `sk-${OneapiStore.selectedToken.key}`
+          : '',
+        ...(newFile ? { filter_by_file_md5: newFile.file_md5 } : {}),
+      }
+    }
+  },
+  { immediate: true }, // 立即执行一次，确保初始化时正确设置
+)
+
+// 修改 chat 计算属性，只在有 knowledge_config 时才包含它
+const chat = computed(() => {
+  const baseConfig = {
+    question: inputMessage.value,
+    session_id: currentSession.value?._id,
+    chat_config: chat_config.value,
+    llm_config: llm_config.value,
+  }
+
+  // 只有当 knowledge_config 存在时才添加到配置中
+  if (knowledge_config.value) {
+    return {
+      ...baseConfig,
+      knowledge_config: knowledge_config.value,
+    }
+  }
+
+  return baseConfig
+})
 
 // 选项卡激活项
 const activeTab = ref('assistants')
 
-// 模拟数据 - 实际项目中应该从API获取
 const assistants = computed(() => assistantStore.getAssistantList)
 const topics = computed(() => sessionStore.getSessionsList)
 
@@ -206,7 +267,7 @@ const loadMessages = async () => {
   }
 }
 
-// 加载更多历史消息 - 移除日志
+// 加载更多历史消息
 const loadMoreMessages = async () => {
   if (currentPage.value >= totalPages.value || messagesLoading.value) return
   currentPage.value++
@@ -239,14 +300,14 @@ const loadMoreMessages = async () => {
   }
 }
 
-// 处理滚动事件 - 移除日志
+// 处理滚动事件
 const handleScroll = ({ scrollTop }) => {
   if (scrollTop < 10 && !messagesLoading.value && currentPage.value < totalPages.value) {
     loadMoreMessages()
   }
 }
 
-// 发送消息函数 - 移除日志
+// 发送消息函数
 const sendMessage = async () => {
   if (!OneapiStore.selectedModel) {
     ElMessage.info('请先选择一个模型')
@@ -602,6 +663,83 @@ const handleDeleteSession = async (session) => {
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
+
+              <!-- 知识库选择下拉菜单 -->
+              <el-dropdown trigger="click">
+                <el-button>
+                  <el-icon><Collection /></el-icon>
+                  {{ selectedKnowledgeBaseName }}
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <template v-if="knowledgeStore.knowledgeBases.length === 0">
+                      <el-dropdown-item disabled>暂无可用知识库</el-dropdown-item>
+                    </template>
+                    <template v-else>
+                      <!-- 添加"不使用知识库"选项 -->
+                      <el-dropdown-item
+                        :class="{
+                          'kb-selected': !knowledgeStore.KBtoChat,
+                        }"
+                        @click="handleSelectKnowledgeBase(null)"
+                      >
+                        不使用知识库
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        v-for="kb in knowledgeStore.knowledgeBases"
+                        :key="kb._id"
+                        :class="{
+                          'kb-selected': kb._id === knowledgeStore.KBtoChat?._id,
+                        }"
+                        @click="handleSelectKnowledgeBase(kb)"
+                      >
+                        <div class="kb-item">
+                          <span class="kb-name">{{ kb.title }}</span>
+                          <span class="kb-files-count"
+                            >{{ kb.filesList?.length || 0 }} 个文件</span
+                          >
+                        </div>
+                      </el-dropdown-item>
+                    </template>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+
+              <!-- 文件选择下拉菜单 -->
+              <el-dropdown trigger="click" :disabled="!knowledgeStore.KBtoChat">
+                <el-button :disabled="!knowledgeStore.KBtoChat">
+                  {{ selectedFileName }}
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <template v-if="!knowledgeStore.KBtoChat">
+                      <el-dropdown-item disabled>请先选择知识库</el-dropdown-item>
+                    </template>
+                    <template v-else>
+                      <!-- 添加"文件全选"选项 -->
+                      <el-dropdown-item
+                        :class="{
+                          'file-selected': !knowledgeStore.FileToChat,
+                        }"
+                        @click="handleSelectFile(null)"
+                      >
+                        文件全选
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        v-for="file in knowledgeStore.KBtoChat.filesList"
+                        :key="file.file_md5"
+                        :class="{
+                          'file-selected':
+                            file.file_md5 === knowledgeStore.FileToChat?.file_md5,
+                        }"
+                        @click="handleSelectFile(file)"
+                      >
+                        {{ file.file_name }}
+                      </el-dropdown-item>
+                    </template>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </el-button-group>
 
             <!-- 右侧聊天按钮组 -->
@@ -646,14 +784,16 @@ const handleDeleteSession = async (session) => {
 /* 移除 scoped，因为需要影响全局样式 */
 .el-dropdown-menu {
   .el-dropdown-menu__item {
-    .token-item {
+    .token-item,
+    .kb-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
       width: 100%;
 
-      .token-name {
+      .token-name,
+      .kb-name {
         flex: 1;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -661,7 +801,8 @@ const handleDeleteSession = async (session) => {
         margin-right: 5px;
       }
 
-      .token-quota {
+      .token-quota,
+      .kb-files-count {
         color: $primary-color;
         font-size: 0.9em;
         white-space: nowrap;
@@ -679,7 +820,9 @@ const handleDeleteSession = async (session) => {
   }
 
   .token-selected,
-  .model-selected {
+  .model-selected,
+  .kb-selected,
+  .file-selected {
     color: $primary-color;
     font-weight: 500;
 

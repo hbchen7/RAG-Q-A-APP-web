@@ -20,6 +20,10 @@ export const useKnowledgeStore = defineStore(
     const loading = ref(false) // 加载状态
     const error = ref(null) // 错误信息
 
+    // 新增：用于聊天的知识库选择状态
+    const KBtoChat = ref(null) // 聊天时选中的知识库
+    const FileToChat = ref(null) // 聊天时选中的文件
+
     // --- Getters ---
     /**
      * @description 获取当前选中的知识库对象
@@ -231,12 +235,32 @@ export const useKnowledgeStore = defineStore(
       console.log('尝试从 localStorage 加载 knowledge store...')
     }
 
+    // 新增：设置聊天时使用的知识库
+    const setChatKnowledgeBase = (kb) => {
+      KBtoChat.value = kb
+      // 重置文件选择
+      FileToChat.value = null
+    }
+
+    // 新增：设置聊天时使用的文件
+    const setChatFile = (file) => {
+      FileToChat.value = file
+    }
+
+    // 新增：清除聊天时的知识库和文件选择
+    const clearChatKnowledgeBase = () => {
+      KBtoChat.value = null
+      FileToChat.value = null
+    }
+
     return {
       // State
       knowledgeBases,
       selectedKbId,
       loading,
       error,
+      KBtoChat,
+      FileToChat,
       // Getters
       selectedKnowledgeBase,
       // Actions
@@ -247,6 +271,10 @@ export const useKnowledgeStore = defineStore(
       deleteFile,
       deleteKnowledge, // 导出删除知识库 action
       loadFromLocalStorage, // 保留以备将来使用
+      // 新增的 actions
+      setChatKnowledgeBase,
+      setChatFile,
+      clearChatKnowledgeBase,
     }
   },
   {
@@ -257,8 +285,7 @@ export const useKnowledgeStore = defineStore(
         {
           key: STORE_KEY,
           storage: localStorage,
-          // 只持久化知识库列表和当前选中的 ID
-          paths: ['knowledgeBases', 'selectedKbId'],
+          paths: ['knowledgeBases', 'selectedKbId', 'KBtoChat', 'FileToChat'], // 添加新的持久化字段
         },
       ],
     },
