@@ -16,15 +16,18 @@ import { oneapiModelListStore, useAuthStore } from '@/stores'
 import { useAssistantStore } from '@/stores/modules/assistant'
 import { useSessionStore } from '@/stores/modules/session'
 import { useKnowledgeStore } from '@/stores/modules/knowledge'
+import { useChatConfigStore } from '@/stores/modules/chatConfig'
 import { renderMarkdown } from '@/utils/markdown'
 import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
 import EditSessionDialog from '@/components/EditSessionDialog.vue'
+import SettingSlider from '@/components/SettingSlider.vue'
 
 const OneapiStore = oneapiModelListStore()
 const assistantStore = useAssistantStore()
 const sessionStore = useSessionStore()
 const knowledgeStore = useKnowledgeStore()
+const chatConfigStore = useChatConfigStore()
 
 // 在组件挂载时初始化
 onMounted(async () => {
@@ -172,21 +175,25 @@ const llm_config = computed(() => ({
   supplier: 'oneapi',
   model: OneapiStore.selectedModel,
   api_key: OneapiStore.selectedToken?.key ? `sk-${OneapiStore.selectedToken.key}` : '',
-  temperature: 0.8,
+  temperature: chatConfigStore.temperature,
 }))
 // 知识库配置
 const knowledge_config = ref(null) // 初始值设为 null
 
 // 监听 KBtoChat 和 FileToChat 的变化，更新 knowledge_config
 watch(
-  [() => knowledgeStore.KBtoChat, () => knowledgeStore.FileToChat],
-  ([newKB, newFile]) => {
+  [
+    () => knowledgeStore.KBtoChat,
+    () => knowledgeStore.FileToChat,
+    () => chatConfigStore.searchK, // 添加对 searchK 的监听
+  ],
+  ([newKB, newFile, newSearchK]) => {
     if (!newKB) {
       knowledge_config.value = null
     } else {
       knowledge_config.value = {
         knowledge_base_id: newKB._id,
-        search_k: 3,
+        search_k: newSearchK, // 使用最新的 searchK 值
         embedding_supplier: 'oneapi',
         embedding_model: 'BAAI/bge-m3',
         embedding_api_key: OneapiStore.selectedToken?.key
@@ -196,7 +203,7 @@ watch(
       }
     }
   },
-  { immediate: true }, // 立即执行一次，确保初始化时正确设置
+  { immediate: true },
 )
 
 // 修改 chat 计算属性，只在有 knowledge_config 时才包含它
@@ -560,7 +567,25 @@ const handleDeleteSession = async (session) => {
         <el-tab-pane label="设置" name="settings">
           <!-- 设置选项 -->
           <div class="settings-content">
-            <p>设置内容开发中...</p>
+            <SettingSlider
+              v-model="chatConfigStore.searchK"
+              label="知识库检索片段"
+              description="设置每次检索时返回的相关文本片段数量。数值越大，召回的内容越多，但可能会增加噪音。"
+              :min="1"
+              :max="10"
+              :step="1"
+              @change="chatConfigStore.setSearchK"
+            />
+
+            <SettingSlider
+              v-model="chatConfigStore.temperature"
+              label="模型温度"
+              description="控制模型回答的创造性。较低的值会产生更确定和一致的回答，较高的值会产生更多样和创造性的回答。"
+              :min="0"
+              :max="2"
+              :step="0.1"
+              @change="chatConfigStore.setTemperature"
+            />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -1157,6 +1182,54 @@ const handleDeleteSession = async (session) => {
       :deep(.el-empty__description p) {
         // 示例：修改描述文字颜色
         color: $text-secondary;
+      }
+    }
+  }
+
+  .settings-content {
+    padding: 20px;
+
+    .setting-item {
+      margin-bottom: 24px;
+      padding: 16px;
+      border-radius: $border-radius-m;
+      background-color: #fff;
+      box-shadow: $box-shadow-outer-m;
+
+      .setting-label {
+        font-size: 16px;
+        font-weight: 500;
+        color: $text-primary;
+        margin-bottom: 12px;
+      }
+
+      .setting-description {
+        margin-top: 8px;
+        font-size: 14px;
+        color: $text-secondary;
+        line-height: 1.5;
+      }
+
+      :deep(.el-slider) {
+        margin-top: 8px;
+        width: 100%;
+
+        .el-slider__runway {
+          background-color: $light-bg;
+        }
+
+        .el-slider__bar {
+          background-color: $primary-color;
+        }
+
+        .el-slider__button {
+          border-color: $primary-color;
+        }
+
+        .el-slider__input {
+          width: 80px;
+          margin-left: 16px;
+        }
       }
     }
   }
