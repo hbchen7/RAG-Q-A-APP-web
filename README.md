@@ -14,6 +14,7 @@
 - sass--css预处理器
 - Eslint9 + Prettier --代码规范工具
 - date-fns --日期格式化工具
+- marked --Markdown渲染库
 
 # 前端项目结构
 

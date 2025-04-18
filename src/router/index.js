@@ -37,11 +37,7 @@ const router = createRouter({
               name: 'modelConfig',
               component: () => import('@/views/setting/modelsConfigPage.vue'),
             },
-            {
-              path: 'defaultModel',
-              name: 'defaultModel',
-              component: () => import('@/views/setting/defaultModelPage.vue'),
-            },
+
             {
               path: 'about',
               name: 'about',

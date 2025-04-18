@@ -26,11 +26,6 @@ const handleNavigation = (route) => {
             <span class="menu-text">模型服务</span>
           </el-menu-item>
 
-          <el-menu-item index="library" @click="handleNavigation('defaultModel')">
-            <el-icon><Collection /></el-icon>
-            <span class="menu-text">默认模型</span>
-          </el-menu-item>
-
           <el-menu-item index="setting" @click="handleNavigation('about')">
             <el-icon><Setting /></el-icon>
             <span class="menu-text">关于我们</span>
