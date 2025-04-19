@@ -1,23 +1,54 @@
 <script setup>
 import { RouterView, useRouter } from 'vue-router'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
-import { useAuthStore } from '@/stores/auth'
+import { ElProgress } from 'element-plus'
+import { useAuthStore, oneapiModelListStore } from '@/stores'
+import userAvatar from '@/assets/ic_user.jpg' // 导入用户头像图片
 
 const router = useRouter()
 const auth = useAuthStore()
+const oneapiModelList = oneapiModelListStore()
 
 // 控制用户信息卡片的显示
 const showUserCard = ref(false)
 
-// 用户信息（后续从store中获取）
+// 用户信息
 const userInfo = ref({
-  avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-  username: '测试用户',
+  avatar: userAvatar, // 使用导入的头像变量
+  username: auth.user.username,
 })
 
+// --- 新增计算属性 ---
+const quotaConversionRate = 500000 // 500,000 quota = $1
+
+// 总配额等价美元
+const totalQuotaDollars = computed(() => {
+  if (oneapiModelList.accountQuota <= 0) return '$0.00'
+  return `$${(oneapiModelList.accountQuota / quotaConversionRate).toFixed(2)}`
+})
+
+// 已用配额等价美元
+const usedQuotaDollars = computed(() => {
+  if (oneapiModelList.accountUsedQuota <= 0) return '$0.00'
+  return `$${(oneapiModelList.accountUsedQuota / quotaConversionRate).toFixed(2)}`
+})
+
+// 剩余配额等价美元 (复用 store 中的计算属性)
+const remainQuotaDollars = computed(() => oneapiModelList.remainQuotaAmount)
+
+// 已用配额百分比
+const usedPercentage = computed(() => {
+  if (oneapiModelList.accountQuota <= 0) return 0
+  const percentage =
+    (oneapiModelList.accountUsedQuota / oneapiModelList.accountQuota) * 100
+  // 确保百分比在 0 到 100 之间
+  return Math.max(0, Math.min(percentage, 100))
+})
+// --- 结束新增计算属性 ---
+
 // 导航到对应路由
-const handleNavigation = (route) => {
+const handleNavigation = async (route) => {
   router.push({ name: route })
 }
 
@@ -31,7 +62,7 @@ const handleLogout = () => {
 <template>
   <el-container class="main-container">
     <!-- 左侧导航栏 -->
-    <el-aside width="64px" class="aside">
+    <el-aside class="aside">
       <div class="nav-menu">
         <!-- 用户头像 -->
         <div class="avatar-container">
@@ -48,6 +79,25 @@ const handleLogout = () => {
             <div class="user-card">
               <el-avatar :size="60" :src="userInfo.avatar" />
               <h3>{{ userInfo.username }}</h3>
+
+              <!-- 配额信息显示区域 -->
+              <div class="quota-info">
+                <div class="quota-text">
+                  <span>已用: {{ usedQuotaDollars }}</span>
+                  <span>总额: {{ totalQuotaDollars }}</span>
+                </div>
+                <el-progress
+                  :percentage="usedPercentage"
+                  :stroke-width="10"
+                  :show-text="false"
+                  color="#4b70e2"
+                  striped
+                  striped-flow
+                />
+                <div class="quota-remain">剩余额度: {{ remainQuotaDollars }}</div>
+              </div>
+              <!-- 结束：配额信息显示区域 -->
+
               <el-button type="danger" size="small" @click="handleLogout">
                 退出登录
               </el-button>
@@ -77,7 +127,8 @@ const handleLogout = () => {
             <template #title>个人中心</template>
           </el-menu-item>
 
-          <el-menu-item index="setting" @click="handleNavigation('setting')">
+          <el-menu-item index="setting" @click="handleNavigation('modelConfig')">
+            <!-- 默认进入第一项 -->
             <el-icon><Setting /></el-icon>
             <template #title>设置</template>
           </el-menu-item>
@@ -88,54 +139,26 @@ const handleLogout = () => {
     <!-- 右侧内容区 -->
     <el-main class="main-content">
       <RouterView v-slot="{ Component }">
-        <keep-alive>
-          <component :is="Component" />
-        </keep-alive>
+        <component :is="Component" />
       </RouterView>
     </el-main>
   </el-container>
 </template>
 
-<style>
-/* 确保根元素占满全屏 */
-html,
-body,
-#app {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-</style>
-
 <style scoped lang="scss">
-$light-bg: #ecf0f3;
-$shadow-dark: #d1d9e6;
-$shadow-light: #f9f9f9;
-
 .main-container {
   height: 100vh;
   background-color: $light-bg;
-  display: flex;
   overflow: hidden;
 }
 
 .aside {
   background-color: $light-bg;
-  height: 100vh;
-  position: fixed;
-  left: 0;
-  top: 0;
   z-index: 1000;
   flex-shrink: 0;
-  width: 64px;
+  width: 60px;
   overflow: hidden;
-  // box-shadow:
-  //   8px 8px 15px $shadow-dark,
-  //   -8px -8px 15px $shadow-light;
-  box-shadow:
-    2px 2px 4px rgba(0, 0, 0, 0.05),
-    -2px -2px 4px rgba(255, 255, 255, 0.8);
-  // border-right: 1px solid #e6e6e6;
+  box-shadow: $box-shadow-outer-m;
 
   .nav-menu {
     .avatar-container {
@@ -152,88 +175,67 @@ $shadow-light: #f9f9f9;
     }
 
     .nav-menu-vertical {
-      background-color: transparent;
-
       :deep(.el-menu-item) {
         background-color: $light-bg;
-        margin: 8px;
-        border-radius: 8px;
-        box-shadow: none; // 移除阴影效果
+        height: 60px;
 
         &:hover {
-          background-color: #f5f7fa;
-          box-shadow: none; // 移除悬停阴影
+          background-color: $primary-hover;
         }
 
         &.is-active {
-          color: #4b70e2;
-          background-color: #ecf5ff;
-          box-shadow: none; // 移除激活状态阴影
+          color: $primary-color;
+          background-color: $primary-active;
         }
-      }
-    }
-  }
-}
-
-.nav-menu {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-
-  .avatar-container {
-    padding: 12px;
-    text-align: center;
-    border-bottom: 1px solid #e6e6e6;
-
-    .user-avatar {
-      cursor: pointer;
-      transition: transform 0.3s;
-
-      &:hover {
-        transform: scale(1.1);
-      }
-    }
-  }
-
-  .nav-menu-vertical {
-    border-right: none;
-
-    :deep(.el-menu-item) {
-      height: 60px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-
-      &:hover {
-        background-color: #f5f7fa;
-      }
-
-      &.is-active {
-        background-color: #ecf5ff;
-        color: #409eff;
-      }
-
-      .el-icon {
-        font-size: 20px;
       }
     }
   }
 }
 
 .main-content {
-  margin-left: 64px;
-  min-width: 0;
   overflow: auto;
+  padding: 20px 10px 10px 10px;
 }
 
 .user-card {
   text-align: center;
-  padding: 16px;
+  padding: 5px;
 
   h3 {
     margin: 12px 0;
     font-size: 16px;
-    color: #333;
+    color: $text-primary;
+  }
+
+  .quota-info {
+    margin: 15px 0;
+    padding: 10px;
+    border-radius: $border-radius-m;
+    background-color: #fff;
+    box-shadow: $box-shadow-inner-m;
+
+    .quota-text {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: $text-secondary;
+      margin-bottom: 8px;
+    }
+
+    .el-progress {
+      margin-bottom: 8px;
+    }
+
+    .quota-remain {
+      font-size: 13px;
+      font-weight: 500;
+      color: $primary-color;
+      text-align: left;
+    }
+  }
+
+  .el-button--danger {
+    margin-top: 10px;
   }
 }
 </style>

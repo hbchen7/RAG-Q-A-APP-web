@@ -1,9 +1,12 @@
 import { createPinia } from 'pinia'
-import persist from 'pinia-plugin-persistedstate'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+
 const pinia = createPinia()
-pinia.use(persist)
+pinia.use(piniaPluginPersistedstate)
 
 export default pinia
-// /import useUserStore from './modules/user/
-// export {useUserStore}
-export * from './modules/user'
+export * from './modules/auth'
+export * from './modules/LLMconfig'
+export * from './modules/oneapiModelList'
+export * from './modules/session'
+export * from './modules/assistant'

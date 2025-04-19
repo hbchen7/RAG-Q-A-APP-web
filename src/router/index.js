@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/stores'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -7,7 +7,7 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('@/components/login/LoginPage.vue'),
+      component: () => import('@/views/LoginPage.vue'),
       meta: { requiresAuth: false },
     },
     {
@@ -24,17 +24,26 @@ const router = createRouter({
         {
           path: 'library',
           name: 'library',
-          component: () => import('@/views/LibraryPage.vue'),
+          component: () => import('@/views/KnowledgeBase.vue'),
         },
-        {
-          path: 'personal',
-          name: 'personal',
-          component: () => import('@/views/PersonalPage.vue'),
-        },
+
         {
           path: 'setting',
           name: 'setting',
           component: () => import('@/views/SettingPage.vue'),
+          children: [
+            {
+              path: 'modelConfig',
+              name: 'modelConfig',
+              component: () => import('@/views/setting/modelsConfigPage.vue'),
+            },
+
+            {
+              path: 'about',
+              name: 'about',
+              component: () => import('@/views/setting/aboutPage.vue'),
+            },
+          ],
         },
       ],
     },

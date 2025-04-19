@@ -1,0 +1,81 @@
+/*背景色 */
+$light-bg: #ecf0f3;
+
+// 阴影参数
+$shadow-dark: #d1d9e6;
+$shadow-light: #f9f9f9;
+
+// 主色调
+$primary-color: #4b70e2;
+$primary-hover: #f5f7fa;
+$primary-active: #e4eaf1;
+
+// 文本颜色
+$text-primary: #333;
+$text-secondary: #999;
+
+// 覆盖 Element Plus 的 CSS 变量
+:root {
+  --el-color-primary: #{$primary-color}; // 使用 Sass 变量设置 Element Plus 主色 CSS 变量
+
+  // 可选：覆盖其他相关的 Element Plus 颜色变量以保持一致性
+  // 例如，如果你希望 hover、active、disabled 状态的颜色也基于新的主色调生成，
+  // 你可能需要覆盖 --el-color-primary-light-3, --el-color-primary-light-5,
+  // --el-color-primary-light-7, --el-color-primary-light-8, --el-color-primary-light-9,
+  // --el-color-primary-dark-2 等。
+  // 一个简单的例子 (可以使用 Sass 的颜色函数如 mix(), lighten(), darken() 来生成):
+  // --el-color-primary-light-3: mix(white, $primary-color, 30%); // 示例：生成浅色
+  // --el-color-primary-dark-2: mix(black, $primary-color, 20%); // 示例：生成深色
+}
+
+// 阴影变量
+$box-shadow-outer-m://外凸效果
+  2px 2px 4px rgba(0, 0, 0, 0.05),
+  -2px -2px 4px rgba(255, 255, 255, 0.8);
+$box-shadow-inner-m://内凹效果
+  inset 2px 2px 4px $shadow-dark,
+  inset -2px -2px 4px $shadow-light;
+$box-shadow-inner-L://内凹效果
+  inset 4px 4px 8px $shadow-dark,
+  inset -4px -4px 8px $shadow-light;
+
+// 圆角
+$border-radius-m: 8px;
+
+// 过渡效果
+$transition-duration: 0.1s;
+$transition-timing-function: ease-in-out;
+
+// 按钮hover、active效果
+@mixin botton-hover-active-effect(
+  $HoverScale: 1.1,
+  $ActiveScale: 0.98,
+  $is-box-shadow: true
+) {
+  transition: transform $transition-duration $transition-timing-function;
+  &:hover {
+    transform: scale($HoverScale);
+  }
+  &:active {
+    transform: scale($ActiveScale); // 轻微缩小
+    @if $is-box-shadow {
+      box-shadow: $box-shadow-inner-m; // 内凹效果
+    }
+  }
+}
+
+// 输入框内凹效果
+@mixin textarea_inner-effect($padding: 16px, $margin: 0 16px 16px, $inner: true) {
+  padding: $padding;
+  margin: $margin;
+  border-radius: $border-radius-m;
+  background-color: $light-bg;
+
+  @if $inner {
+    :deep(.el-textarea__inner) {
+      background-color: $light-bg;
+      box-shadow: $box-shadow-inner-m; // 内凹效果
+      border-radius: $border-radius-m;
+    }
+  }
+}
