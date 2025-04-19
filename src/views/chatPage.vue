@@ -8,9 +8,9 @@ import {
   MoreFilled,
   Edit,
   Collection,
+  VideoPause,
 } from '@element-plus/icons-vue'
-import { ElMessage, ElEmpty, ElMessageBox } from 'element-plus'
-import { sayHelloAPI } from '@/api/chatAPI'
+import { ElMessage, ElEmpty, ElMessageBox, ElNotification } from 'element-plus'
 import { getSessionHistoryAPI } from '@/api/sessionAPI'
 import { oneapiModelListStore, useAuthStore } from '@/stores'
 import { useAssistantStore } from '@/stores/modules/assistant'
@@ -22,7 +22,8 @@ import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
 import EditSessionDialog from '@/components/EditSessionDialog.vue'
 import SettingSlider from '@/components/SettingSlider.vue'
-
+import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { baseURL } from '@/utils/request'
 const OneapiStore = oneapiModelListStore()
 const assistantStore = useAssistantStore()
 const sessionStore = useSessionStore()
@@ -43,6 +44,9 @@ onMounted(async () => {
 // 在组件卸载时清理
 onUnmounted(() => {
   OneapiStore.cleanup()
+  if (abortController.value) {
+    abortController.value.abort()
+  }
 })
 
 // 计算属性：当前选中的令牌名称
@@ -98,8 +102,12 @@ const currentSession = computed(() => sessionStore.getCurrentSession)
 const messages = ref([])
 // 输入框内容
 const inputMessage = ref('')
-// 消息加载状态
+// 消息加载状态 (用于历史记录)
 const messagesLoading = ref(false)
+// 流式响应状态
+const isStreaming = ref(false)
+// AbortController ref
+const abortController = ref(null)
 // 分页相关
 const currentPage = ref(1)
 const pageSize = ref(5)
@@ -206,26 +214,6 @@ watch(
   { immediate: true },
 )
 
-// 修改 chat 计算属性，只在有 knowledge_config 时才包含它
-const chat = computed(() => {
-  const baseConfig = {
-    question: inputMessage.value,
-    session_id: currentSession.value?._id,
-    chat_config: chat_config.value,
-    llm_config: llm_config.value,
-  }
-
-  // 只有当 knowledge_config 存在时才添加到配置中
-  if (knowledge_config.value) {
-    return {
-      ...baseConfig,
-      knowledge_config: knowledge_config.value,
-    }
-  }
-
-  return baseConfig
-})
-
 // 选项卡激活项
 const activeTab = ref('assistants')
 
@@ -314,8 +302,9 @@ const handleScroll = ({ scrollTop }) => {
   }
 }
 
-// 发送消息函数
+// 发送消息函数 - 重构为使用 fetchEventSource
 const sendMessage = async () => {
+  // 1. 前置检查 (Guard Clauses)
   if (!OneapiStore.selectedModel) {
     ElMessage.info('请先选择一个模型')
     return
@@ -324,31 +313,214 @@ const sendMessage = async () => {
     ElMessage.info('请先选择一个话题')
     return
   }
-  if (!inputMessage.value.trim()) return
+  if (!inputMessage.value.trim() || isStreaming.value) return // 防止重复发送或在流式传输时发送
 
+  // 2. 取消之前的流式请求 (如果存在)
+  if (abortController.value) {
+    abortController.value.abort()
+    console.log('Previous stream aborted.')
+  }
+
+  // 3. 初始化本次请求
+  abortController.value = new AbortController() // 创建新的 AbortController
+  const userMessageContent = inputMessage.value.trim()
   const userMessage = {
+    // 准备用户消息对象
     id: Date.now(),
     type: 'human',
-    content: inputMessage.value,
+    content: userMessageContent,
   }
-  messages.value.push(userMessage)
-  const messagePayload = chat.value
-  const currentInput = inputMessage.value
-  inputMessage.value = ''
+  messages.value.push(userMessage) // 将用户消息添加到聊天记录
 
+  // 4. 构建请求体 (Payload)
+  const messagePayload = {
+    question: userMessageContent,
+    session_id: currentSession.value?._id,
+    chat_config: chat_config.value,
+    llm_config: llm_config.value,
+    ...(knowledge_config.value ? { knowledge_config: knowledge_config.value } : {}), // 动态添加知识库配置
+  }
+
+  // 5. 更新 UI 状态 (开始流式传输)
+  inputMessage.value = '' // 清空输入框
+  isStreaming.value = true // 设置为流式状态 (会禁用输入框，改变发送按钮)
+
+  // 6. 添加 AI 消息占位符
+  const aiMessageId = Date.now() + 1 // 为 AI 回复生成唯一 ID
+  messages.value.push({
+    id: aiMessageId,
+    type: 'ai',
+    content: '', // 初始内容为空，等待后续 chunk 更新
+  })
+  let accumulatedContent = '' // 用于累积收到的文本块
+
+  // 7. 调用 fetchEventSource 发起 SSE 请求
   try {
-    console.log('发送消息 payload:', messagePayload)
-    const response = await sayHelloAPI(messagePayload)
-    messages.value.push({
-      id: Date.now() + 1,
-      type: 'ai',
-      content: response.answer,
+    console.log('发送流式消息 payload:', messagePayload)
+    await fetchEventSource(baseURL + '/chat/stream', {
+      // baseURL 来自 @/utils/request
+      method: 'POST', // 使用 POST 方法
+      headers: {
+        'Content-Type': 'application/json', // 告知后端发送的是 JSON
+        Accept: 'text/event-stream', // 表明希望接收 SSE 流
+      },
+      body: JSON.stringify(messagePayload), // 将 JS 对象序列化为 JSON 字符串
+      signal: abortController.value.signal, // 关联 AbortController，用于取消请求
+
+      // 8. 事件处理回调函数
+
+      // 8.1 onopen: 连接成功建立时调用
+      onopen(response) {
+        if (
+          response.ok && // 确保 HTTP 状态码是 2xx
+          response.headers.get('content-type')?.includes('text/event-stream') // 确认响应类型正确
+        ) {
+          console.log('SSE connection opened.')
+          // 连接成功，AI 消息占位符已添加，等待 onmessage
+        } else {
+          // 如果连接不成功或响应类型不对，则认为失败
+          isStreaming.value = false // 重置流式状态
+          throw new Error(`Failed to connect: ${response.status} ${response.statusText}`) // 抛出错误，会被外层 catch 或 onerror 捕获
+        }
+      },
+
+      // 8.2 onmessage: 每次收到服务器发送的事件 (data: ...\n\n) 时调用
+      onmessage(event) {
+        console.log('Received SSE data:', event.data)
+        try {
+          const parsedData = JSON.parse(event.data) // 解析收到的 JSON 字符串
+          // 找到对应的 AI 消息占位符
+          const aiMessageIndex = messages.value.findIndex((msg) => msg.id === aiMessageId)
+
+          if (aiMessageIndex === -1) {
+            // 如果找不到，可能消息已被删除或出现异常
+            console.warn('AI message placeholder not found.')
+            return
+          }
+
+          // 根据事件类型处理
+          if (parsedData.type === 'context') {
+            // 处理上下文信息，可以使用 ElNotification 弹出通知
+            console.log('Context received:', parsedData.data)
+            // ElNotification({ title: 'Context', message: parsedData.data, type: 'info' })
+          } else if (parsedData.type === 'chunk') {
+            // 核心：处理文本块
+            accumulatedContent += parsedData.data // 将新块追加到累积内容
+            // 更新 Vue ref 中对应消息的内容，触发界面响应式更新
+            messages.value[aiMessageIndex].content = accumulatedContent
+            scrollToBottom() // 收到新内容，自动滚动到底部
+          } else if (parsedData.type === 'error') {
+            // 处理流内由后端报告的错误
+            console.error('Stream error reported:', parsedData.data)
+            messages.value[aiMessageIndex].content += `\n\n**错误:** ${parsedData.data}` // 将错误信息附加到消息末尾
+            ElMessage.error(`流式响应出错: ${parsedData.data}`)
+            // 发生错误，尝试中止连接
+            if (abortController.value) {
+              abortController.value.abort()
+            }
+          }
+        } catch (e) {
+          // 处理 JSON 解析失败的情况
+          console.error('Failed to parse SSE data:', e, 'Raw data:', event.data)
+          const aiMessageIndex = messages.value.findIndex((msg) => msg.id === aiMessageId)
+          if (aiMessageIndex !== -1 && event.data && typeof event.data === 'string') {
+            // 尝试将原始错误数据附加到消息中
+            messages.value[aiMessageIndex].content +=
+              `\n\n**解析错误，原始数据:** ${event.data}`
+          }
+          ElMessage.error('接收到无效的数据格式')
+          // 解析错误，中止连接
+          if (abortController.value) {
+            abortController.value.abort()
+          }
+        }
+      },
+
+      // 8.3 onclose: 连接正常关闭时调用 (服务器关闭或客户端调用 abort())
+      onclose() {
+        console.log('SSE connection closed.')
+        isStreaming.value = false // 重置流式状态
+        abortController.value = null // 重置 AbortController 引用
+        scrollToBottom() // 确保最后滚动到底部
+      },
+
+      // 8.4 onerror: 发生错误时调用 (网络错误、onopen/onmessage 中抛出的错误、AbortError)
+      onerror(err) {
+        console.error('SSE error:', err)
+        isStreaming.value = false // 只要出错，就重置流式状态 (除了 AbortError)
+
+        // 找到 AI 消息
+        const aiMessageIndex = messages.value.findIndex((msg) => msg.id === aiMessageId)
+
+        // 特殊处理 AbortError (用户手动取消)
+        if (err.name === 'AbortError') {
+          console.log('Stream aborted by user.')
+          // 如果 AI 消息还是空的，就把它从列表里移除
+          if (aiMessageIndex !== -1 && !messages.value[aiMessageIndex].content) {
+            messages.value.splice(aiMessageIndex, 1)
+          }
+          // **重要:** 对于 AbortError，我们直接 return，不执行后续错误处理，
+          // 也不抛出错误，以防止库尝试重连。状态重置由 handleStopStreaming 或 onclose 处理。
+          return
+        }
+
+        // 处理其他类型的错误 (网络、连接等)
+        ElMessage.error(`连接错误: ${err.message || '未知错误'}`)
+        if (aiMessageIndex !== -1) {
+          // 在 AI 消息末尾附加错误信息
+          messages.value[aiMessageIndex].content +=
+            `\n\n**连接错误:** ${err.message || '未知错误'}`
+        } else {
+          // 如果连 AI 占位符都没有（可能 onopen 就失败了），则添加一条错误消息
+          messages.value.push({
+            id: Date.now(),
+            type: 'ai',
+            content: `**连接错误:** ${err.message || '未知错误'}`,
+          })
+        }
+
+        abortController.value = null // 重置 AbortController 引用
+        // **重要:** 对于非 AbortError，必须抛出错误 (throw err) 或不返回。
+        // 这是 fetchEventSource 库的设计，抛出错误会阻止它默认的重连尝试。
+        throw err
+      },
     })
-  } catch (error) {
-    ElMessage.error('发送消息失败')
-    console.error('发送消息 API 调用失败:', error)
-    messages.value = messages.value.filter((m) => m.id !== userMessage.id)
-    inputMessage.value = currentInput
+  } catch (err) {
+    // 9. 捕获 fetchEventSource 启动时的错误
+    // 这个 catch 主要捕获 fetchEventSource 启动时就发生的错误，
+    // 例如 DNS 解析失败、网络连接无法建立等，这些错误发生在 onopen 之前。
+    // onerror 中 throw 的错误也会在这里被捕获，但我们主要处理非 AbortError。
+    console.error('Error initiating SSE request:', err)
+    isStreaming.value = false // 确保重置状态
+
+    if (err.name !== 'AbortError') {
+      // AbortError 已在 onerror 处理
+      ElMessage.error(`请求失败: ${err.message || '未知错误'}`)
+      // 标记用户消息发送失败
+      const userMessageIndex = messages.value.findIndex(
+        (msg) => msg.id === userMessage.id,
+      )
+      if (userMessageIndex !== -1) {
+        messages.value[userMessageIndex].content += ' (发送失败)'
+      }
+      // 移除可能已添加的 AI 占位符
+      const aiMessageIndex = messages.value.findIndex((msg) => msg.id === aiMessageId)
+      if (aiMessageIndex !== -1) {
+        messages.value.splice(aiMessageIndex, 1)
+      }
+    }
+    abortController.value = null // 重置 AbortController 引用
+  }
+}
+
+// 处理停止流式传输的函数
+const handleStopStreaming = () => {
+  if (abortController.value) {
+    abortController.value.abort()
+    console.log('User requested to stop streaming.')
+    // 主动重置状态，确保 UI 立即响应
+    isStreaming.value = false
+    abortController.value = null
   }
 }
 
@@ -459,6 +631,24 @@ const handleDeleteSession = async (session) => {
       console.error('删除会话失败:', err)
     }
   }
+}
+
+// 新增：处理删除按钮点击
+const handleDeleteButtonClick = () => {
+  ElNotification({
+    title: 'Hello~你好呀',
+    message: '功能开发中，敬请期待',
+    type: 'info',
+  })
+}
+
+// 新增：处理设置按钮点击
+const handleSettingButtonClick = () => {
+  ElNotification({
+    title: 'Hello~你好呀',
+    message: '功能开发中，敬请期待',
+    type: 'info',
+  })
 }
 </script>
 
@@ -613,16 +803,20 @@ const handleDeleteSession = async (session) => {
               </transition-group>
             </div>
           </el-scrollbar>
+          <!-- 添加流式加载提示 -->
+          <div v-if="isStreaming" class="streaming-indicator">...</div>
         </div>
 
         <!-- 输入框区域 -->
         <div class="chat-input">
+          <!-- 在流式传输时禁用输入框 -->
           <el-input
             v-model="inputMessage"
             type="textarea"
             :rows="3"
             placeholder="请输入消息..."
             @keyup.enter="sendMessage"
+            :disabled="isStreaming"
           />
           <div class="input-actions">
             <!--左侧下拉菜单按钮组 -->
@@ -769,9 +963,25 @@ const handleDeleteSession = async (session) => {
 
             <!-- 右侧聊天按钮组 -->
             <el-button-group>
-              <el-button :icon="Delete"></el-button>
-              <el-button :icon="Setting"></el-button>
-              <el-button @click="sendMessage">⬆️</el-button>
+              <el-button :icon="Delete" @click="handleDeleteButtonClick"></el-button>
+              <el-button :icon="Setting" @click="handleSettingButtonClick"></el-button>
+              <!-- 条件渲染发送/停止按钮 -->
+              <el-button
+                v-if="!isStreaming"
+                @click="sendMessage"
+                :disabled="!inputMessage.trim()"
+              >
+                ⬆️
+                <!-- 发送图标 -->
+              </el-button>
+              <el-button
+                v-else
+                @click="handleStopStreaming"
+                :icon="VideoPause"
+                type="danger"
+              >
+                <!-- 停止图标, 使用 danger 类型以示区分 -->
+              </el-button>
             </el-button-group>
           </div>
         </div>
@@ -1183,6 +1393,14 @@ const handleDeleteSession = async (session) => {
         // 示例：修改描述文字颜色
         color: $text-secondary;
       }
+    }
+
+    .streaming-indicator {
+      text-align: center;
+      color: $text-secondary;
+      padding: 10px;
+      font-style: italic;
+      font-size: 0.9em;
     }
   }
 
