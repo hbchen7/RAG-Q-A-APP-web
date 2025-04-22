@@ -39,11 +39,10 @@ export const updateAssistantAPI = (assistantId, data) => {
 
 /**
  * @description 删除指定的助手及其关联的所有会话和聊天记录
- * @param {object} params - 查询参数
- * @param {string} params.assistant_id - 要删除的助手的 ID
+ * @param {string} assistantId - 要删除的助手的 ID
  * @returns {Promise} 返回一个 Promise 对象，包含删除操作的结果信息 (例如：{ message: "..." })
  */
-export const deleteAssistantAPI = (params) => {
-  // 根据后端 assistantRouter.py 定义，assistant_id 是查询参数
-  return request.delete('/assistant/delete', { params })
+export const deleteAssistantAPI = (assistantId) => {
+  // 将 assistantId 作为 URL 路径的一部分
+  return request.delete(`/assistant/delete/${assistantId}`)
 }

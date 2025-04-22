@@ -1,6 +1,6 @@
 <script setup>
 import { RouterView, useRouter } from 'vue-router'
-import { ChatDotSquare, Collection, Setting } from '@element-plus/icons-vue'
+import { ChatDotSquare, Setting } from '@element-plus/icons-vue'
 const router = useRouter()
 
 // 导航到对应路由
@@ -49,9 +49,11 @@ const handleNavigation = (route) => {
   overflow: hidden;
 }
 .aside {
+  width: 15vw;
+  min-width: 150px;
+  max-width: 198px;
   background-color: $light-bg;
   flex-shrink: 0;
-  width: 160px;
   overflow: hidden;
   box-shadow:
     2px 2px 4px rgba(0, 0, 0, 0.05),

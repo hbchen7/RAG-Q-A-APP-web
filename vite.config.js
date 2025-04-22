@@ -9,12 +9,12 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
-// https://vite.dev/config/
 export default defineConfig({
   server: {
+    // 本地开发环境cors配置
     proxy: {
       '/oneapi': {
-        target: 'http://localhost:3001', // OneAPI 地址
+        target: 'http://localhost:3000', // OneAPI 地址
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/oneapi/, ''),
       },

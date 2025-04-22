@@ -112,7 +112,7 @@
               <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
               <template #tip>
                 <div class="el-upload__tip">
-                  支持 Docs、PDF、Markdown、Txt、Excel、Word 等格式，单个文件不超过100MB
+                  现支持 PDF、Txt等格式，现支持上传5MB以内的文件
                 </div>
               </template>
             </el-upload>
@@ -183,13 +183,7 @@ import {
   ElSkeleton,
   ElMessage,
 } from 'element-plus'
-import {
-  Plus,
-  CollectionTag,
-  Delete,
-  MoreFilled,
-  UploadFilled,
-} from '@element-plus/icons-vue'
+import { Plus, Delete, MoreFilled, UploadFilled } from '@element-plus/icons-vue'
 import { useKnowledgeStore } from '@/stores/modules/knowledge'
 import CreateKnowledgeBaseDialog from '@/components/CreateKnowledgeBaseDialog.vue' // 稍后创建
 import { format } from 'date-fns' // 用于格式化日期
@@ -226,7 +220,8 @@ const openCreateDialog = () => {
  */
 const handleCreateKbConfirm = async (formData) => {
   await knowledgeStore.createKnowledgeBase(formData)
-  // 对话框的 v-model 会自动处理关闭
+  // 创建成功后关闭对话框
+  showCreateDialogVisible.value = false
 }
 
 /**
@@ -333,6 +328,9 @@ const handleDeleteFile = async (fileMd5) => {
 }
 
 .kb-sidebar {
+  width: 15vw;
+  min-width: 150px;
+  max-width: 198px;
   background-color: $light-bg; // 侧边栏背景
   box-shadow: $box-shadow-outer-m; // 轻微外凸
   display: flex;

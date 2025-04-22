@@ -2,7 +2,7 @@
 import { RouterView, useRouter } from 'vue-router'
 import { ref, computed } from 'vue'
 import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
-import { ElProgress } from 'element-plus'
+import { ElNotification } from 'element-plus'
 import { useAuthStore, oneapiModelListStore } from '@/stores'
 import userAvatar from '@/assets/ic_user.jpg' // 导入用户头像图片
 
@@ -49,6 +49,13 @@ const usedPercentage = computed(() => {
 
 // 导航到对应路由
 const handleNavigation = async (route) => {
+  if (route == 'personal') {
+    ElNotification({
+      title: 'Hello~你好呀',
+      message: '功能开发中，敬请期待',
+      type: 'info',
+    })
+  }
   router.push({ name: route })
 }
 
@@ -94,7 +101,7 @@ const handleLogout = () => {
                   striped
                   striped-flow
                 />
-                <div class="quota-remain">剩余额度: {{ remainQuotaDollars }}</div>
+                <div class="quota-remain">{{ remainQuotaDollars }}</div>
               </div>
               <!-- 结束：配额信息显示区域 -->
 

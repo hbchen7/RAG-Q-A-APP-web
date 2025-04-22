@@ -6,7 +6,8 @@ pinia.use(piniaPluginPersistedstate)
 
 export default pinia
 export * from './modules/auth'
-export * from './modules/LLMconfig'
 export * from './modules/oneapiModelList'
 export * from './modules/session'
 export * from './modules/assistant'
+export * from './modules/chatConfig'
+export * from './modules/knowledge'

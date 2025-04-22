@@ -50,7 +50,27 @@ async function initializeHighlighter() {
   return highlighter
 }
 
-// 配置 marked 使用 shiki
+// 创建一个自定义渲染器
+const renderer = new marked.Renderer()
+
+// 覆盖 link 方法以添加 target="_blank"
+renderer.link = (href, title, text) => {
+  // 调用原始渲染器的 link 方法生成基础 HTML
+  // 这样可以保留 marked 对 href 和 title 的默认处理逻辑
+  const linkHtml = marked.Renderer.prototype.link.call(renderer, href, title, text)
+  // 使用字符串替换在 <a> 标签开始处安全地插入 target 和 rel 属性
+  // rel="noopener noreferrer" 是安全实践，防止新页面通过 window.opener 访问原始页面
+  return linkHtml.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ')
+}
+
+// 配置 marked 使用自定义渲染器和其他选项
+marked.setOptions({
+  renderer: renderer, // 使用自定义渲染器
+  breaks: true, // 转换换行符为 <br>
+  gfm: true, // 启用 GitHub 风格的 Markdown
+})
+
+// 配置 marked 使用 shiki 进行代码高亮 (通过 marked.use 添加扩展)
 marked.use(
   gfmHeadingId(), // 为标题添加 id
   markedHighlight({
@@ -61,34 +81,36 @@ marked.use(
       // 如果初始化失败或语言不受支持，则进行回退处理
       if (
         !highlighterInstance ||
-        !highlighterInstance.getLoadedLanguages().includes(lang)
+        (lang && !highlighterInstance.getLoadedLanguages().includes(lang)) // 检查 lang 是否存在
       ) {
-        console.warn(
-          `Shiki: Language '${lang}' not loaded or highlighter failed. Falling back.`,
-        )
+        if (lang) {
+          // 只有在提供了 lang 时才警告未知语言
+          console.warn(
+            `Shiki: Language '${lang}' not loaded or highlighter failed. Falling back.`,
+          )
+        }
         // 安全地转义代码，防止 XSS
         const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        return `<pre class="language-${lang || 'plaintext'}"><code>${escapedCode}</code></pre>`
+        // 为没有指定语言或语言无效的代码块添加 'plaintext' 类和 Shiki 主题类
+        return `<pre class="shiki github-light language-${lang || 'plaintext'}"><code>${escapedCode}</code></pre>`
       }
 
       try {
-        // 使用 shiki 生成高亮 HTML，它会包含 <pre> 标签
+        // 使用 shiki 生成高亮 HTML，它会包含 <pre> 标签和正确的类名
         return highlighterInstance.codeToHtml(code, {
-          lang: lang || 'plaintext', // 提供默认语言
+          lang: lang, // 传递获取到的语言
           theme: 'github-light', // 指定主题
         })
       } catch (error) {
         console.error(`Shiki highlighting failed for lang ${lang}:`, error)
         // 高亮过程中出错，同样回退
         const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        return `<pre class="language-${lang || 'plaintext'}"><code>${escapedCode}</code></pre>`
+        // 添加 Shiki 主题类和 'plaintext' 类
+        return `<pre class="shiki github-light language-${lang || 'plaintext'}"><code>${escapedCode}</code></pre>`
       }
     },
   }),
-  {
-    breaks: true, // 转换换行符为 <br>
-    gfm: true, // 启用 GitHub 风格的 Markdown
-  },
+  // 注意：不需要在这里重复设置 breaks 和 gfm，因为它们已在 setOptions 中设置
 )
 
 /**
@@ -100,8 +122,7 @@ export const renderMarkdown = async (text) => {
   // 确保 Shiki 至少尝试初始化一次
   await initializeHighlighter()
   try {
-    // marked.parse 是同步的，但 markedHighlight 使其在内部处理异步
-    // 注意：最新版的 marked 可能直接返回 Promise，使用 await 更稳妥
+    // marked.parse 现在会使用上面 setOptions 和 use 配置好的实例
     return await marked.parse(text)
   } catch (err) {
     console.error('Failed to render markdown with Shiki:', err)
