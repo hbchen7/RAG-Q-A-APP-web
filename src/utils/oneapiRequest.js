@@ -2,7 +2,6 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 // 创建oneapi专用的axios实例
 const oneapiInstance = axios.create({
-  // baseURL: 'http://localhost:3001',
   baseURL: '/oneapi',
   timeout: 10000,
   headers: {

@@ -94,7 +94,7 @@ import { useAuthStore } from '@/stores'
 import { ElMessage } from 'element-plus'
 import { userRegisterAPI } from '@/api/userAPI'
 // 同步注册登录oneapi
-import { login_Oneapi, register_Oneapi, getModelTokens_Oneapi  } from '@/api/oneapi'
+import { login_Oneapi, register_Oneapi } from '@/api/oneapi'
 
 import router from '@/router'
 
@@ -126,11 +126,12 @@ const validateForm = (form, isRegister = false) => {
       return false
     }
   }
-
-  // 验证密码长度
-  if (form.password.length < 8 || form.password.length > 20) {
-    ElMessage.error('密码长度必须在8-20个字符之间')
-    return false
+  if (isRegister) {
+    // 验证注册密码长度-适配oneapi
+    if (form.password.length < 8 || form.password.length > 20) {
+      ElMessage.error('密码长度必须在8-20个字符之间')
+      return false
+    }
   }
 
   // 如果是注册表单，验证用户名
@@ -168,14 +169,14 @@ const handleRegister = async () => {
 
   try {
     await userRegisterAPI(registerForm.value)
-    ElMessage.success('注册成功！')
     // 同步注册登录oneapi
     const oneapiRegister = await register_Oneapi(
       registerForm.value.username,
       registerForm.value.password,
     )
-    isLogin.value = true // 切换到登录表单
     console.log(oneapiRegister)
+
+    isLogin.value = true // 切换到登录表单
   } catch (error) {
     ElMessage.error(error.message || '注册失败，请重试')
   }
@@ -192,9 +193,12 @@ const handleLogin = async () => {
     const username = await auth.login(loginForm.value)
     if (username) {
       // 同步注册登录oneapi
-      await login_Oneapi(loginForm.value.username, loginForm.value.password)
-      const test = await getModelTokens_Oneapi()
-      console.log(test)
+      const oneapiLogin = await login_Oneapi(
+        loginForm.value.username,
+        loginForm.value.password,
+      )
+      console.log(oneapiLogin)
+
       ElMessage.success('登录成功！')
 
       await router.push({ name: 'chat' })

@@ -10,7 +10,7 @@ import { ref, onMounted } from 'vue'
 // 导入 Markdown 渲染函数
 import { renderMarkdown } from '@/utils/markdown.js'
 // 使用 ?raw 后缀导入 Markdown 文件内容为字符串
-import markdownContent from '@/assets/markdown/Setting-About.md?raw'
+import markdownContent from '@/views/setting/Setting-About-Page.md?raw'
 
 // 创建一个 ref 来存储渲染后的 HTML
 const renderedMarkdown = ref('')

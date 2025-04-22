@@ -1,6 +1,7 @@
 <script setup>
 // chatPage.vue script部分
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import {
   Plus,
   Delete,
@@ -12,33 +13,37 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElEmpty, ElMessageBox, ElNotification } from 'element-plus'
 import { getSessionHistoryAPI } from '@/api/sessionAPI'
-import { oneapiModelListStore, useAuthStore } from '@/stores'
-import { useAssistantStore } from '@/stores/modules/assistant'
-import { useSessionStore } from '@/stores/modules/session'
-import { useKnowledgeStore } from '@/stores/modules/knowledge'
-import { useChatConfigStore } from '@/stores/modules/chatConfig'
+import {
+  oneapiModelListStore,
+  useAuthStore,
+  useAssistantStore,
+  useSessionStore,
+  useKnowledgeStore,
+  useChatConfigStore,
+} from '@/stores'
 import { renderMarkdown } from '@/utils/markdown'
 import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
 import EditSessionDialog from '@/components/EditSessionDialog.vue'
 import SettingSlider from '@/components/SettingSlider.vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import { baseURL } from '@/utils/request'
+const baseURL = import.meta.env.VITE_API_BASE_URL
 const OneapiStore = oneapiModelListStore()
 const assistantStore = useAssistantStore()
 const sessionStore = useSessionStore()
 const knowledgeStore = useKnowledgeStore()
 const chatConfigStore = useChatConfigStore()
 
+// 使用 storeToRefs 获取响应式状态
+const { currentAssistant } = storeToRefs(assistantStore)
+const { currentSession } = storeToRefs(sessionStore)
+const { KBtoChat, FileToChat } = storeToRefs(knowledgeStore)
+
 // 在组件挂载时初始化
 onMounted(async () => {
   OneapiStore.init()
   await assistantStore.fetchAssistantList()
   await knowledgeStore.fetchKnowledgeBases()
-  const currentAssistant = assistantStore.currentAssistant
-  if (currentAssistant && currentAssistant._id) {
-    await sessionStore.fetchSessionList(currentAssistant._id)
-  }
 })
 
 // 在组件卸载时清理
@@ -93,10 +98,6 @@ const handleSelectFile = (file) => {
   }
   knowledgeStore.setChatFile(file)
 }
-
-// 当前选中的助手和话题
-const currentAssistant = computed(() => assistantStore.getCurrentAssistant)
-const currentSession = computed(() => sessionStore.getCurrentSession)
 
 // 聊天消息
 const messages = ref([])
@@ -166,18 +167,25 @@ watch(
 watch(
   renderedMessages,
   (newRenderedMessages, oldRenderedMessages) => {
-    if (newRenderedMessages.length > oldRenderedMessages?.length) {
+    // 仅当消息列表长度增加，并且是最后一条消息发生变化时（即新消息被添加到末尾），才滚动到底部
+    // 避免加载历史消息（在列表开头添加）时触发滚动
+    const oldLength = oldRenderedMessages?.length ?? 0
+    const newLength = newRenderedMessages.length
+    if (
+      newLength > oldLength &&
+      newRenderedMessages[newLength - 1]?.id !== oldRenderedMessages?.[oldLength - 1]?.id
+    ) {
       scrollToBottom()
     }
   },
   { deep: true },
 )
 
-// 聊天配置
-const chat_config = ref({
-  chat_history_max_length: 5,
-  prompt_override: assistantStore.currentAssistant?.prompt || '',
-})
+// 聊天配置 - 使用 storeToRefs 获取的 currentAssistant
+const chat_config = computed(() => ({
+  chat_history_max_length: 15,
+  prompt_override: currentAssistant.value?.prompt || '', // 助手配置的 prompt
+}))
 // llm 模型配置
 const llm_config = computed(() => ({
   supplier: 'oneapi',
@@ -190,23 +198,15 @@ const knowledge_config = ref(null) // 初始值设为 null
 
 // 监听 KBtoChat 和 FileToChat 的变化，更新 knowledge_config
 watch(
-  [
-    () => knowledgeStore.KBtoChat,
-    () => knowledgeStore.FileToChat,
-    () => chatConfigStore.searchK, // 添加对 searchK 的监听
-  ],
+  [KBtoChat, FileToChat, () => chatConfigStore.searchK],
   ([newKB, newFile, newSearchK]) => {
     if (!newKB) {
       knowledge_config.value = null
     } else {
       knowledge_config.value = {
         knowledge_base_id: newKB._id,
-        search_k: newSearchK, // 使用最新的 searchK 值
-        embedding_supplier: 'oneapi',
-        embedding_model: 'BAAI/bge-m3',
-        embedding_api_key: OneapiStore.selectedToken?.key
-          ? `sk-${OneapiStore.selectedToken.key}`
-          : '',
+        search_k: newSearchK,
+
         ...(newFile ? { filter_by_file_md5: newFile.file_md5 } : {}),
       }
     }
@@ -223,19 +223,27 @@ const topics = computed(() => sessionStore.getSessionsList)
 // 选择助手
 const handleSelectAssistant = async (assistant) => {
   assistantStore.selectAssistant(assistant)
+  console.log(
+    'handleSelectAssistant - currentAssistant after select:',
+    currentAssistant.value,
+  )
 
-  // 立即加载该助手的会话列表
-  if (assistant && assistant._id) {
-    await sessionStore.fetchSessionList(assistant._id)
+  if (currentAssistant.value && currentAssistant.value._id) {
+    await sessionStore.fetchSessionList(currentAssistant.value._id)
+  } else {
+    console.log('Assistant cleared, clearing sessions.')
+    sessionStore.sessionsList = []
+    sessionStore.setCurrentSession(null)
   }
 
-  // 切换到话题标签页
   activeTab.value = 'topics'
 }
 
 // 选择话题
 const handleSelectSession = (session) => {
   sessionStore.setCurrentSession(session)
+  currentPage.value = 1 // 重置当前页码为 1
+  totalPages.value = 0 // 重置总页数，等待 loadMessages 重新获取
   loadMessages()
 }
 
@@ -386,7 +394,7 @@ const sendMessage = async () => {
 
       // 8.2 onmessage: 每次收到服务器发送的事件 (data: ...\n\n) 时调用
       onmessage(event) {
-        console.log('Received SSE data:', event.data)
+        // console.log('Received SSE data:', event.data)
         try {
           const parsedData = JSON.parse(event.data) // 解析收到的 JSON 字符串
           // 找到对应的 AI 消息占位符
@@ -532,18 +540,23 @@ const handleCreateAssistantConfirm = (assistantData) => {
 }
 
 // 监听当前助手的变化，以加载会话列表
-watch(
-  () => assistantStore.currentAssistant,
-  async (newAssistant) => {
-    if (newAssistant && newAssistant._id) {
-      await sessionStore.fetchSessionList(newAssistant._id)
-    } else {
-      sessionStore.sessionsList = []
-      sessionStore.currentSession = null
-    }
-  },
-  { immediate: true }, // 添加 immediate: true，确保组件挂载时就执行一次
-)
+watch(currentAssistant, async (newAssistant, oldAssistant) => {
+  console.log(
+    'Watch triggered: currentAssistant changed',
+    'New:',
+    newAssistant,
+    'Old:',
+    oldAssistant,
+  )
+  if (newAssistant && newAssistant._id && newAssistant._id !== oldAssistant?._id) {
+    console.log('Fetching sessions for new assistant:', newAssistant._id)
+    await sessionStore.fetchSessionList(newAssistant._id)
+  } else if (!newAssistant) {
+    console.log('Assistant cleared, clearing sessions.')
+    sessionStore.sessionsList = []
+    sessionStore.setCurrentSession(null)
+  }
+})
 
 // 打开创建助手对话框
 const openCreateAssistantDialog = () => {
@@ -668,6 +681,7 @@ const handleSettingButtonClick = () => {
               :icon="Plus"
               circle
               size="small"
+              :disabled="!currentAssistant"
             />
           </div>
           <div class="list-content">
@@ -925,31 +939,30 @@ const handleSettingButtonClick = () => {
               </el-dropdown>
 
               <!-- 文件选择下拉菜单 -->
-              <el-dropdown trigger="click" :disabled="!knowledgeStore.KBtoChat">
-                <el-button :disabled="!knowledgeStore.KBtoChat">
+              <el-dropdown trigger="click" :disabled="!KBtoChat">
+                <el-button :disabled="!KBtoChat">
                   {{ selectedFileName }}
                 </el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <template v-if="!knowledgeStore.KBtoChat">
+                    <template v-if="!KBtoChat">
                       <el-dropdown-item disabled>请先选择知识库</el-dropdown-item>
                     </template>
                     <template v-else>
                       <!-- 添加"文件全选"选项 -->
                       <el-dropdown-item
                         :class="{
-                          'file-selected': !knowledgeStore.FileToChat,
+                          'file-selected': !FileToChat,
                         }"
                         @click="handleSelectFile(null)"
                       >
                         文件全选
                       </el-dropdown-item>
                       <el-dropdown-item
-                        v-for="file in knowledgeStore.KBtoChat.filesList"
+                        v-for="file in KBtoChat.filesList"
                         :key="file.file_md5"
                         :class="{
-                          'file-selected':
-                            file.file_md5 === knowledgeStore.FileToChat?.file_md5,
+                          'file-selected': file.file_md5 === FileToChat?.file_md5,
                         }"
                         @click="handleSelectFile(file)"
                       >
@@ -969,7 +982,7 @@ const handleSettingButtonClick = () => {
               <el-button
                 v-if="!isStreaming"
                 @click="sendMessage"
-                :disabled="!inputMessage.trim()"
+                :disabled="!inputMessage.trim() || !currentSession"
               >
                 ⬆️
                 <!-- 发送图标 -->
@@ -1184,7 +1197,9 @@ const handleSettingButtonClick = () => {
   border-radius: $border-radius-m;
 
   .sidebar {
-    width: 200px;
+    width: 15vw;
+    min-width: 150px;
+    max-width: 198px;
     display: flex;
     flex-direction: column;
 
@@ -1268,7 +1283,7 @@ const handleSettingButtonClick = () => {
 
       // 设置 Tab 特定样式
       .settings-content {
-        padding: 16px; // 示例：给设置内容一些内边距
+        padding: 20px 5px 5px 5px;
       }
     }
   }

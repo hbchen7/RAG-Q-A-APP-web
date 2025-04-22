@@ -236,7 +236,7 @@ export const useAssistantStore = defineStore(
       setLoading(true)
       setError(null)
       try {
-        await deleteAssistantAPI({ assistant_id: assistantId })
+        await deleteAssistantAPI(assistantId)
         ElMessage.success('助手删除成功')
 
         // 从列表中移除该助手
@@ -287,7 +287,7 @@ export const useAssistantStore = defineStore(
         {
           key: 'assistant-store',
           storage: localStorage,
-          paths: ['assistantList', 'currentAssistant'], // 确保包含这两个
+          paths: ['assistantList'], // 只保留 assistantList
           afterRestore: (ctx) => {
             // 添加恢复后的处理
             console.log('Store 状态恢复后:', ctx.store.$state)
