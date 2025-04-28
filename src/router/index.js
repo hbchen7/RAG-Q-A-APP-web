@@ -1,11 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores'
-
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(),
   routes: [
     {
-      path: '/login',
+      path: '/',
       name: 'login',
       component: () => import('@/views/LoginPage.vue'),
       meta: { requiresAuth: false },
@@ -53,7 +52,6 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const auth = useAuthStore()
-
   // 检查路由是否需要认证
   if (to.meta.requiresAuth !== false && !auth.isAuthenticated) {
     // 如果需要认证且用户未登录，重定向到登录页

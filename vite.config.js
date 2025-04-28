@@ -10,6 +10,7 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
+  base: '/',
   server: {
     // 本地开发环境cors配置
     proxy: {
@@ -31,7 +32,6 @@ export default defineConfig({
       resolvers: [ElementPlusResolver()],
     }),
   ],
-  // base: '/',
   css: {
     preprocessorOptions: {
       scss: {
@@ -43,5 +43,9 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
   },
 })

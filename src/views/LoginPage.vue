@@ -89,9 +89,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '@/stores'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { userRegisterAPI } from '@/api/userAPI'
 // 同步注册登录oneapi
 import { login_Oneapi, register_Oneapi } from '@/api/oneapi'
@@ -101,7 +101,7 @@ import router from '@/router'
 const auth = useAuthStore()
 
 // 控制登录/注册表单的切换
-const isLogin = ref(true)
+const isLogin = ref(false)
 
 // 注册表单数据
 const registerForm = ref({
@@ -114,6 +114,50 @@ const registerForm = ref({
 const loginForm = ref({
   username: '',
   password: '',
+})
+
+// 辅助函数：异步延迟
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// 在组件挂载后执行
+onMounted(async () => {
+  // 检查环境变量 VITE_RELEASE_TO_SHOW 是否为 'true'
+  if (import.meta.env.VITE_RELEASE_TO_SHOW === 'true') {
+    try {
+      await ElMessageBox.alert(
+        '体验账号：user1<br/>密码：123123123', // 使用 <br/> 进行换行
+        '欢迎你的来到',
+        {
+          confirmButtonText: '出发', // 自定义按钮文字
+          type: 'info', // 设置消息类型
+          dangerouslyUseHTMLString: true, // 允许在 message 中使用 HTML
+        },
+      )
+
+      // 用户点击了 "出发"
+      await delay(900) // 延迟
+      isLogin.value = true // 切换到登录表单
+
+      await delay(1200) // 等待动画完成
+      loginForm.value.username = 'user1' // 填充用户名
+      loginForm.value.password = '123123123' // 填充密码
+
+      await delay(1000) // 再延迟 1 秒
+      handleLogin() // 调用登录函数
+    } catch (action) {
+      // 用户可能通过点击遮罩层或按 ESC 关闭了 MessageBox
+      console.log('MessageBox closed without confirming:', action)
+      await delay(900) //
+      isLogin.value = true // 切换到登录表单
+
+      await delay(1200)
+      loginForm.value.username = 'user1' // 填充用户名
+      loginForm.value.password = '123123123' // 填充密码
+
+      await delay(1000) // 再延迟 1 秒
+      handleLogin() // 调用登录函数
+    }
+  }
 })
 
 // 表单验证规则
@@ -200,11 +244,11 @@ const handleLogin = async () => {
       console.log(oneapiLogin)
 
       ElMessage.success('登录成功！')
+      await nextTick() // 等待下一个 DOM 更新周期
 
       await router.push({ name: 'chat' })
 
       // 如果仍然不生效，可以尝试强制刷新
-
       // window.location.href = '/hello/chat'
     } else {
       ElMessage.error('用户名或密码错误')
