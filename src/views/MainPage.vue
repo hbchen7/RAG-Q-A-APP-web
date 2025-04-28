@@ -131,7 +131,7 @@ const handleLogout = () => {
 
           <el-menu-item index="personal" @click="handleNavigation('personal')">
             <el-icon><User /></el-icon>
-            <template #title>个人中心</template>
+            <template #title>MCP</template>
           </el-menu-item>
 
           <el-menu-item index="setting" @click="handleNavigation('modelConfig')">
