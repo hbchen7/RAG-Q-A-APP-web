@@ -30,3 +30,21 @@ pnpm dev
 # 相关项目
 
 - [One API](https://github.com/songquanpeng/one-api)
+
+## 技术栈
+
+## 前端
+
+- Vue3--前端框架
+- ElementPlus --UI组件库
+- ElementPlus/icons --图标库
+- axios--http请求库
+- pinia--状态管理库
+- vite--打包工具
+- sass--css预处理器
+- Eslint9 + Prettier --代码规范工具
+- date-fns --日期格式化工具
+- marked --Markdown渲染库
+- **CDN:** Cloudflare (用于加速和安全)
+
+# 前端项目结构

@@ -7,8 +7,10 @@ export const useChatConfigStore = defineStore(
   'chatConfig',
   () => {
     // --- State ---
-    const searchK = ref(3) // 知识库检索片段数量
-    const temperature = ref(0.8) // 模型温度
+    const searchK = ref(10) // 知识库检索片段数量
+    const temperature = ref(1) // 模型温度
+    const bm25K = ref(3) // BM25 检索条目，默认为3
+    const rerankTopN = ref(5) // Reranker 重排序条目，默认为5
 
     // --- Actions ---
     const setSearchK = (value) => {
@@ -19,13 +21,25 @@ export const useChatConfigStore = defineStore(
       temperature.value = value
     }
 
+    const setBm25K = (value) => {
+      bm25K.value = value
+    }
+
+    const setRerankTopN = (value) => {
+      rerankTopN.value = value
+    }
+
     return {
       // State
       searchK,
       temperature,
+      bm25K,
+      rerankTopN,
       // Actions
       setSearchK,
       setTemperature,
+      setBm25K,
+      setRerankTopN,
     }
   },
   {
@@ -35,7 +49,7 @@ export const useChatConfigStore = defineStore(
         {
           key: STORE_KEY,
           storage: localStorage,
-          paths: ['searchK', 'temperature'],
+          paths: ['searchK', 'temperature', 'bm25K', 'rerankTopN'],
         },
       ],
     },

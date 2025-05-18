@@ -143,6 +143,24 @@ import { ArrowDown } from '@element-plus/icons-vue'
 import BaseFormDialog from '@/components/BaseFormDialog.vue'
 import { oneapiModelListStore } from '@/stores' // 引入 oneapi store
 
+/**
+ * @const {string[]} embeddingModels - 适用于创建知识库的嵌入模型名称关键词列表 (小写).
+ * @description 用于在创建知识库前验证用户选择的模型是否为嵌入模型。
+ */
+const embeddingModels = [
+  'bge-m3',
+  'nomic embed',
+  'text-embedding-3-small',
+  'text-embedding-3-large',
+  'text-embedding-ada-002',
+  'e5-mistral', // 确认这是否确实是 embedding-only
+  'jina-embeddings-v2-base-en',
+  'bge-large-en-v1.5',
+  'bge-small-zh',
+  'bge-multilingual-gemma2',
+  'bge-icl',
+].map((name) => name.toLowerCase()) // 转为小写，便于不区分大小写比较
+
 const props = defineProps({
   modelValue: {
     // for v-model
@@ -240,11 +258,31 @@ watch(
 // --- Methods ---
 
 /**
- * @description 根据选中的令牌更新 API Key 和可用模型列表，并重置选中的模型
+ * @description 将 API Key 脱敏处理 (例如 sk-abcd****wxyz)
+ * @param {string} key - 原始 API Key (需要包含 sk- 前缀)
+ * @returns {string} 脱敏后的 API Key 或 'N/A'
+ */
+const maskApiKey = (key) => {
+  if (!key || typeof key !== 'string' || !key.startsWith('sk-')) {
+    return '无效 Key' // 或者返回空字符串
+  }
+  const actualKey = key.substring(3) // 去掉 'sk-'
+  if (actualKey.length <= 8) {
+    // 如果 key 太短，可以考虑不同的处理方式，这里简单处理
+    return `sk-${actualKey.substring(0, 2)}****${actualKey.substring(actualKey.length - 2)}`
+  }
+  const prefix = actualKey.substring(0, 4)
+  const suffix = actualKey.substring(actualKey.length - 4)
+  return `sk-${prefix}****${suffix}`
+}
+
+/**
+ * @description 根据选中的令牌更新 API Key (脱敏显示) 和可用模型列表，并重置选中的模型
  * @param {object} token - 选中的令牌对象
  */
 const updateApiKeyAndModels = (token) => {
-  form.embeddingApiKey = token.key ? `sk-${token.key}` : '' // 自动填充 API Key
+  // 使用 maskApiKey 函数处理后赋值给 form.embeddingApiKey 用于展示
+  form.embeddingApiKey = token.key ? maskApiKey(`sk-${token.key}`) : ''
   // 注意：这里直接使用了 oneapiStore.availableModels，它会根据 oneapiStore.selectedToken 变化
   // 但我们的表单状态 selectedTokenId 可能与 store 不同步
   // 应该基于 form.selectedTokenId 对应的 token 来确定可用模型
@@ -302,23 +340,56 @@ const handleCancel = () => {
 const handleConfirm = async () => {
   if (!formRef.value) return
   try {
+    // 1. 执行基础表单校验
     await formRef.value.validate()
-    // 构造提交给 store 的数据
+
+    // --- 新增检查逻辑 开始 ---
+    // 2. 检查选择的模型是否为嵌入模型
+    const selectedModelNameLower = form.embeddingModel?.toLowerCase() // 获取选中模型名称并转小写
+
+    // 检查 selectedModelNameLower 是否包含 embeddingModels 数组中的任何一个元素
+    const isEmbeddingModelSelected =
+      selectedModelNameLower &&
+      embeddingModels.some((embedModel) => selectedModelNameLower.includes(embedModel))
+
+    if (!isEmbeddingModelSelected) {
+      // 如果选择的不是嵌入模型，则提示并阻止
+      ElMessage.warning(
+        '请选择一个有效的嵌入模型进行知识库创建，例如 bge-m3 或 text-embedding 系列。',
+      )
+      return // 阻止后续执行
+    }
+    // --- 新增检查逻辑 结束 ---
+
+    // 3. (如果通过检查) 查找选中的令牌以获取原始 Key
+    const selectedToken = oneapiStore.tokenList.find((t) => t.id === form.selectedTokenId)
+
+    if (!selectedToken || !selectedToken.key) {
+      ElMessage.error('无法获取所选令牌的有效 API Key，请检查令牌配置')
+      return // 阻止继续执行
+    }
+
+    // 4. 构造提交给 store 的数据
     const dataToSubmit = {
       title: form.title,
       tag: form.tag,
       description: form.description,
       embedding_config: {
         embedding_model: form.embeddingModel,
-        embedding_supplier: 'oneapi', // 根据需求固定或修改
-        embedding_apikey: form.embeddingApiKey,
+        embedding_supplier: 'oneapi',
+        embedding_apikey: `sk-${selectedToken.key}`,
       },
     }
+    // 5. 触发确认事件
     emit('confirm', dataToSubmit)
-    // dialogVisible.value = false; // 让父组件控制关闭
+    // dialogVisible.value = false; // 通常由父组件在 confirm 事件后关闭
   } catch (error) {
-    console.log('表单校验失败', error)
-    ElMessage.warning('请检查表单输入项')
+    // 捕获 validate() 的 reject 或其他错误
+    console.log('表单校验或处理失败', error)
+    // 避免重复提示，如果不是上面嵌入模型的警告，则提示检查表单
+    if (!(error instanceof Error && error.message.includes('嵌入模型'))) {
+      ElMessage.warning('请检查表单输入项是否完整且有效')
+    }
   }
 }
 </script>

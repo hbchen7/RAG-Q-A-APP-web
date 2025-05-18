@@ -26,6 +26,7 @@ import CreateAssistantDialog from '@/components/CreateAssistantDialog.vue'
 import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
 import EditSessionDialog from '@/components/EditSessionDialog.vue'
 import SettingSlider from '@/components/SettingSlider.vue'
+import ToolCallDisplay from '@/components/ToolCallDisplay.vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 const baseURL = import.meta.env.VITE_API_BASE_URL
 const OneapiStore = oneapiModelListStore()
@@ -117,6 +118,55 @@ const totalPages = ref(0)
 const renderedMessages = ref([])
 const scrollbarRef = ref(null)
 
+// --- 新增代码 开始 ---
+/**
+ * @const {string[]} embeddingModels - 不适用于聊天的嵌入模型名称列表 (小写).
+ * @description 用于在发送消息前检查用户是否误选了嵌入模型。
+ */
+const embeddingModels = [
+  'bge-m3',
+  'nomic embed',
+  'text-embedding-3-small',
+  'text-embedding-3-large',
+  'text-embedding-ada-002',
+  'e5-mistral', // 确认这是否确实是 embedding-only
+  'jina-embeddings-v2-base-en',
+  'bge-large-en-v1.5',
+  'bge-small-zh',
+  'bge-multilingual-gemma2',
+  'bge-icl',
+].map((name) => name.toLowerCase()) // 转为小写，便于不区分大小写比较
+
+/**
+ * @ref {ComponentPublicInstance | null} tokenDropdownButtonRef - 对令牌选择下拉菜单按钮的引用.
+ * @description 用于在脚本中触发按钮点击事件。
+ */
+const tokenDropdownButtonRef = ref(null)
+
+/**
+ * @ref {boolean} isAgentEnabled - 控制是否使用 Agent特定 的 API 端点。
+ * @description 如果启用了 agent 模式则为 true，否则为 false。默认为 false。
+ */
+const isAgentEnabled = ref(false)
+// --- 新增代码 结束 ---
+
+// 监听 Agent 开关状态变化并发送通知
+watch(isAgentEnabled, (newValue) => {
+  if (newValue) {
+    ElNotification({
+      title: '已启用agent',
+      message: 'agent模式即将支持使用知识库功能',
+      type: 'info',
+    })
+  } else {
+    ElNotification({
+      title: '已关闭agent',
+      message: '您现在可以使用知识库功能',
+      type: 'info',
+    })
+  }
+})
+
 // 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
@@ -193,26 +243,55 @@ const llm_config = computed(() => ({
   api_key: OneapiStore.selectedToken?.key ? `sk-${OneapiStore.selectedToken.key}` : '',
   temperature: chatConfigStore.temperature,
 }))
-// 知识库配置
-const knowledge_config = ref(null) // 初始值设为 null
+// 知识库配置 - 重构为计算属性
+const knowledge_config = computed(() => {
+  const kb = KBtoChat.value
+  const file = FileToChat.value
+  const searchK = chatConfigStore.searchK
+  const bm25K = chatConfigStore.bm25K // 从 store 获取 bm25K
+  const rerankTopN = chatConfigStore.rerankTopN // 从 store 获取 rerankTopN
 
-// 监听 KBtoChat 和 FileToChat 的变化，更新 knowledge_config
-watch(
-  [KBtoChat, FileToChat, () => chatConfigStore.searchK],
-  ([newKB, newFile, newSearchK]) => {
-    if (!newKB) {
-      knowledge_config.value = null
-    } else {
-      knowledge_config.value = {
-        knowledge_base_id: newKB._id,
-        search_k: newSearchK,
+  if (!kb) {
+    return null // 如果没有选择知识库，则返回 null
+  }
 
-        ...(newFile ? { filter_by_file_md5: newFile.file_md5 } : {}),
-      }
+  const config = {
+    knowledge_base_id: kb._id,
+    search_k: searchK,
+  }
+
+  // 根据 bm25K 的值动态添加 BM25 配置
+  if (bm25K > 0) {
+    config.use_bm25 = true
+    config.bm25_k = bm25K
+  } else {
+    config.use_bm25 = false
+  }
+
+  // 根据 rerankTopN 的值动态添加 Reranker 配置
+  if (rerankTopN > 0) {
+    config.reranker_config = {
+      use_reranker: true,
+      reranker_type: 'remote',
+      remote_rerank_config: {
+        model: 'BAAI/bge-reranker-v2-m3',
+        api_key: 'sk-vlscwpfeobatirqzooxdzhwgxeqgdnkvyyirsgumudzbekxb',
+      },
+      rerank_top_n: rerankTopN,
     }
-  },
-  { immediate: true },
-)
+  } else {
+    // 如果 rerankTopN 为0，可以不传递整个 reranker_config，或者显式设置 use_reranker: false
+    // 这里选择不传递整个 reranker_config，符合后端接口可选参数的预期
+    // 如果后端要求必须有 reranker_config 对象，则需要调整为:
+    // config.reranker_config = { use_reranker: false };
+  }
+
+  if (file) {
+    config.filter_by_file_md5 = file.file_md5 // 如果选择了文件，添加文件过滤条件
+  }
+
+  return config
+})
 
 // 选项卡激活项
 const activeTab = ref('assistants')
@@ -312,6 +391,35 @@ const handleScroll = ({ scrollTop }) => {
 
 // 发送消息函数 - 重构为使用 fetchEventSource
 const sendMessage = async () => {
+  // --- 修改代码 开始 ---
+  // 0. 检查是否选择了嵌入模型
+  const selectedModelNameLower = OneapiStore.selectedModel?.toLowerCase() // 获取选中模型名称并转小写
+
+  // 使用 .some() 检查 selectedModelNameLower 是否包含 embeddingModels 数组中的任何一个元素
+  const isEmbeddingModelSelected =
+    selectedModelNameLower &&
+    embeddingModels.some((embedModel) => selectedModelNameLower.includes(embedModel))
+
+  if (isEmbeddingModelSelected) {
+    ElNotification({
+      title: '模型选择提示',
+      message: '您当前选择的是嵌入模型，需要选择语言模型进行对话哦，例如 DeepSeek ',
+      type: 'warning', // 使用 warning 类型更合适
+      duration: 5000, // 显示 5 秒
+    })
+
+    // 自动触发令牌下拉菜单点击
+    // Element Plus 的 ElButton 组件实例可以通过 $el 访问其根 DOM 元素
+    if (tokenDropdownButtonRef.value && tokenDropdownButtonRef.value.$el) {
+      tokenDropdownButtonRef.value.$el.click() // 模拟点击按钮
+      console.log('自动触发令牌下拉菜单')
+    } else {
+      console.warn('无法找到令牌下拉菜单按钮元素来触发点击')
+    }
+    return // 阻止后续的消息发送流程
+  }
+  // --- 修改代码 结束 ---
+
   // 1. 前置检查 (Guard Clauses)
   if (!OneapiStore.selectedModel) {
     ElMessage.info('请先选择一个模型')
@@ -365,7 +473,12 @@ const sendMessage = async () => {
   // 7. 调用 fetchEventSource 发起 SSE 请求
   try {
     console.log('发送流式消息 payload:', messagePayload)
-    await fetchEventSource(baseURL + '/chat/stream', {
+    // 启用agent,则使用"/agent/mcp",若不启用，则使用"/chat/stream"
+    const endpoint = isAgentEnabled.value ? '/agent/mcp' : '/chat/stream'
+    console.log(
+      `发送消息，Agent模式: ${isAgentEnabled.value ? '启用' : '关闭'}, 端点: ${endpoint}`,
+    ) // 调试信息
+    await fetchEventSource(baseURL + endpoint, {
       // baseURL 来自 @/utils/request
       method: 'POST', // 使用 POST 方法
       headers: {
@@ -402,25 +515,83 @@ const sendMessage = async () => {
 
           if (aiMessageIndex === -1) {
             // 如果找不到，可能消息已被删除或出现异常
-            console.warn('AI message placeholder not found.')
+            console.warn('AI message placeholder not found for message handling.')
             return
           }
+
+          const currentAiMessage = messages.value[aiMessageIndex]
 
           // 根据事件类型处理
           if (parsedData.type === 'context') {
             // 处理上下文信息，可以使用 ElNotification 弹出通知
             console.log('Context received:', parsedData.data)
-            // ElNotification({ title: 'Context', message: parsedData.data, type: 'info' })
+            ElNotification({ title: 'Context', message: parsedData.data, type: 'info' })
           } else if (parsedData.type === 'chunk') {
             // 核心：处理文本块
             accumulatedContent += parsedData.data // 将新块追加到累积内容
             // 更新 Vue ref 中对应消息的内容，触发界面响应式更新
-            messages.value[aiMessageIndex].content = accumulatedContent
+            currentAiMessage.content = accumulatedContent
             scrollToBottom() // 收到新内容，自动滚动到底部
+          } else if (parsedData.type === 'tool_call') {
+            console.log('Tool call received:', parsedData.data)
+            // 初始化 tool_calls 数组（如果不存在）
+            if (!currentAiMessage.tool_calls) {
+              currentAiMessage.tool_calls = []
+            }
+            // 添加新的工具调用对象
+            currentAiMessage.tool_calls.push({
+              call_id: parsedData.data.id, // 从事件数据中获取 id
+              name: parsedData.data.name,
+              args: parsedData.data.args,
+              result_content: null,
+              is_loading: true,
+              show_result_dialog: false,
+            })
+            ElNotification({
+              title: 'Tool call initiated',
+              message: `工具: ${parsedData.data.name}`,
+              type: 'info',
+            })
+          } else if (parsedData.type === 'tool_result') {
+            console.log('Tool result received:', parsedData.data)
+            if (currentAiMessage.tool_calls && currentAiMessage.tool_calls.length > 0) {
+              const toolCallIndex = currentAiMessage.tool_calls.findIndex(
+                (tc) => tc.call_id === parsedData.data.tool_call_id,
+              )
+              if (toolCallIndex !== -1) {
+                currentAiMessage.tool_calls[toolCallIndex].result_content =
+                  parsedData.data.content
+                currentAiMessage.tool_calls[toolCallIndex].is_loading = false
+                ElNotification({
+                  title: 'Tool Result Received',
+                  message: `工具 ${currentAiMessage.tool_calls[toolCallIndex].name} 执行完毕。`,
+                  type: 'success',
+                })
+              } else {
+                console.warn(
+                  'Received tool_result for an unknown call_id:',
+                  parsedData.data.tool_call_id,
+                )
+                ElNotification({
+                  title: 'Tool Result Warning',
+                  message: `收到未知工具调用的结果 (ID: ${parsedData.data.tool_call_id})`,
+                  type: 'warning',
+                })
+              }
+            } else {
+              console.warn(
+                'Received tool_result but no tool_calls array exists or is empty.',
+              )
+              ElNotification({
+                title: 'Tool Result Warning',
+                message: '收到工具结果，但当前AI消息没有预期的工具调用记录。',
+                type: 'warning',
+              })
+            }
           } else if (parsedData.type === 'error') {
             // 处理流内由后端报告的错误
             console.error('Stream error reported:', parsedData.data)
-            messages.value[aiMessageIndex].content += `\n\n**错误:** ${parsedData.data}` // 将错误信息附加到消息末尾
+            currentAiMessage.content += `\n\n**错误:** ${parsedData.data}` // 将错误信息附加到消息末尾
             ElMessage.error(`流式响应出错: ${parsedData.data}`)
             // 发生错误，尝试中止连接
             if (abortController.value) {
@@ -663,6 +834,40 @@ const handleSettingButtonClick = () => {
     type: 'info',
   })
 }
+
+// 新增：处理工具调用显示区域更新
+const handleShowResultDialogUpdate = (messageItem, call_id, value) => {
+  // messageItem 是 renderedMessages 中的一项，我们需要找到原始 messages 中的对应项来修改
+  const originalMessageIndex = messages.value.findIndex((m) => m.id === messageItem.id)
+  if (originalMessageIndex !== -1) {
+    const originalMessage = messages.value[originalMessageIndex]
+    if (originalMessage && originalMessage.tool_calls) {
+      const toolCallIndex = originalMessage.tool_calls.findIndex(
+        (tc) => tc.call_id === call_id,
+      )
+      if (toolCallIndex !== -1) {
+        originalMessage.tool_calls[toolCallIndex].show_result_dialog = value
+      } else {
+        console.warn(
+          'handleShowResultDialogUpdate: Tool call with id ',
+          call_id,
+          'not found in message id:',
+          originalMessage.id,
+        )
+      }
+    } else {
+      console.warn(
+        'handleShowResultDialogUpdate: Original message or tool_calls not found for message id:',
+        messageItem.id,
+      )
+    }
+  } else {
+    console.warn(
+      'handleShowResultDialogUpdate: Original message not found for message id:',
+      messageItem.id,
+    )
+  }
+}
 </script>
 
 <template>
@@ -773,10 +978,10 @@ const handleSettingButtonClick = () => {
           <div class="settings-content">
             <SettingSlider
               v-model="chatConfigStore.searchK"
-              label="知识库检索片段"
+              label="知识库检索条目"
               description="设置每次检索时返回的相关文本片段数量。数值越大，召回的内容越多，但可能会增加噪音。"
               :min="1"
-              :max="10"
+              :max="32"
               :step="1"
               @change="chatConfigStore.setSearchK"
             />
@@ -789,6 +994,26 @@ const handleSettingButtonClick = () => {
               :max="2"
               :step="0.1"
               @change="chatConfigStore.setTemperature"
+            />
+
+            <SettingSlider
+              v-model="chatConfigStore.bm25K"
+              label="BM25 检索条目"
+              description="设置 BM25 混合检索时返回的条目数量。值为 0 时禁用 BM25。"
+              :min="0"
+              :max="10"
+              :step="1"
+              @change="chatConfigStore.setBm25K"
+            />
+
+            <SettingSlider
+              v-model="chatConfigStore.rerankTopN"
+              label="Reranker 检索条目"
+              description="设置 Reranker 重排序时处理的条目数量。值为 0 时禁用 Reranker。"
+              :min="0"
+              :max="10"
+              :step="1"
+              @change="chatConfigStore.setRerankTopN"
             />
           </div>
         </el-tab-pane>
@@ -809,10 +1034,30 @@ const handleSettingButtonClick = () => {
                   class="message"
                   :class="message.type"
                 >
-                  <div
-                    class="message-content markdown-body"
-                    v-html="message.renderedContent"
-                  ></div>
+                  <div class="message-content-wrapper">
+                    <div
+                      class="message-content markdown-body"
+                      v-html="message.renderedContent"
+                    ></div>
+                    <div
+                      v-if="
+                        message.type === 'ai' &&
+                        message.tool_calls &&
+                        message.tool_calls.length > 0
+                      "
+                      class="tool-calls-container"
+                    >
+                      <ToolCallDisplay
+                        v-for="(toolCall, index) in message.tool_calls"
+                        :key="toolCall.call_id || index"
+                        :tool-call="toolCall"
+                        @update:showResultDialog="
+                          (value) =>
+                            handleShowResultDialogUpdate(message, toolCall.call_id, value)
+                        "
+                      />
+                    </div>
+                  </div>
                 </div>
               </transition-group>
             </div>
@@ -837,7 +1082,11 @@ const handleSettingButtonClick = () => {
             <el-button-group class="el-button-group-chat-left">
               <!-- 令牌选择下拉菜单 -->
               <el-dropdown trigger="click">
-                <el-button :icon="MoreFilled" :loading="OneapiStore.loading">
+                <el-button
+                  :icon="MoreFilled"
+                  :loading="OneapiStore.loading"
+                  ref="tokenDropdownButtonRef"
+                >
                   {{ selectedTokenName }}
                 </el-button>
                 <template #dropdown>
@@ -975,27 +1224,38 @@ const handleSettingButtonClick = () => {
             </el-button-group>
 
             <!-- 右侧聊天按钮组 -->
-            <el-button-group>
-              <el-button :icon="Delete" @click="handleDeleteButtonClick"></el-button>
-              <el-button :icon="Setting" @click="handleSettingButtonClick"></el-button>
-              <!-- 条件渲染发送/停止按钮 -->
-              <el-button
-                v-if="!isStreaming"
-                @click="sendMessage"
-                :disabled="!inputMessage.trim() || !currentSession"
-              >
-                ⬆️
-                <!-- 发送图标 -->
-              </el-button>
-              <el-button
-                v-else
-                @click="handleStopStreaming"
-                :icon="VideoPause"
-                type="danger"
-              >
-                <!-- 停止图标, 使用 danger 类型以示区分 -->
-              </el-button>
-            </el-button-group>
+            <div class="right-controls-wrapper">
+              <div class="custom-control-in-group">
+                <span class="agent-switch-label">启用agent</span>
+                <el-switch
+                  v-model="isAgentEnabled"
+                  size="small"
+                  active-color="#4B70E2"
+                  inactive-color="#dcdfe6"
+                />
+              </div>
+              <el-button-group>
+                <el-button :icon="Delete" @click="handleDeleteButtonClick"></el-button>
+                <el-button :icon="Setting" @click="handleSettingButtonClick"></el-button>
+                <!-- 条件渲染发送/停止按钮 -->
+                <el-button
+                  v-if="!isStreaming"
+                  @click="sendMessage"
+                  :disabled="!inputMessage.trim() || !currentSession"
+                >
+                  ⬆️
+                  <!-- 发送图标 -->
+                </el-button>
+                <el-button
+                  v-else
+                  @click="handleStopStreaming"
+                  :icon="VideoPause"
+                  type="danger"
+                >
+                  <!-- 停止图标, 使用 danger 类型以示区分 -->
+                </el-button>
+              </el-button-group>
+            </div>
           </div>
         </div>
       </template>
@@ -1318,39 +1578,58 @@ const handleSettingButtonClick = () => {
         // message 的基础样式
         display: flex;
         margin-bottom: 20px;
-        max-width: 80%;
+        max-width: 100%;
 
-        .message-content {
+        // 新增：确保 human 类型的消息整体靠右
+        &.human {
+          justify-content: flex-end;
+          // margin-left: auto; // 备选方案，justify-content 在 flex 容器中更直接
+        }
+        // AI 类型的消息默认在左，通常不需要额外处理其对齐
+        // &.ai {
+        //   margin-right: auto; // 如果需要明确推到左边
+        // }
+
+        .message-content-wrapper {
+          display: flex;
+          flex-direction: column;
           padding: 12px 16px;
           border-radius: $border-radius-m;
           font-size: 14px;
           line-height: 1.5;
+          // 不在这里设置 max-width，让它由父级 .message 控制
         }
 
-        // 用户消息特定样式
-        &.human {
-          justify-content: flex-end; // 移到这里
-          margin-left: auto; // 推到右边
-
-          .message-content {
-            background-color: $primary-color; // 统一主色调
-            color: #fff;
-            box-shadow: // 可以给用户消息也加一点阴影
-              2px 2px 4px rgba(0, 0, 0, 0.1),
-              -2px -2px 4px rgba(255, 255, 255, 0.6);
-          }
+        &.human .message-content-wrapper {
+          background-color: $primary-color;
+          color: #fff;
+          box-shadow:
+            2px 2px 4px rgba(0, 0, 0, 0.1),
+            -2px -2px 4px rgba(255, 255, 255, 0.6);
         }
 
-        // 助手消息特定样式
-        &.ai {
-          margin-right: auto; // 推到左边
-          .message-content {
-            background-color: #fff;
-            color: $text-primary; // 确保文字颜色
-            box-shadow:
-              2px 2px 4px rgba(0, 0, 0, 0.05),
-              -2px -2px 4px rgba(255, 255, 255, 0.8);
-          }
+        &.ai .message-content-wrapper {
+          background-color: #fff;
+          color: $text-primary;
+          box-shadow:
+            2px 2px 4px rgba(0, 0, 0, 0.05),
+            -2px -2px 4px rgba(255, 255, 255, 0.8);
+        }
+
+        .message-content {
+          // 这是 v-html="message.renderedContent" 的容器
+          padding: 0;
+          background-color: transparent;
+          box-shadow: none;
+          // 如果 markdown-body 自身有宽度限制，可能需要检查
+          // 通常 v-html 内部的内容会自然适应其容器
+        }
+
+        .tool-calls-container {
+          margin-top: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
         }
       }
 
@@ -1391,6 +1670,28 @@ const handleSettingButtonClick = () => {
             border: none;
             color: $primary-color;
             @include botton-hover-active-effect; // 按钮hover/active效果
+          }
+        }
+
+        // 新增：右侧控件包裹容器
+        .right-controls-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 8px; // 控制开关和按钮组之间的间距
+
+          // 开关组件的样式 (之前嵌套在 .el-button-group 内)
+          .custom-control-in-group {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle; // 保持垂直对齐
+
+            .agent-switch-label {
+              margin-right: 8px;
+              font-size: 14px;
+              color: $primary-color; // 使用 theme.scss 定义的主色调
+              white-space: nowrap;
+              line-height: 1; // 辅助垂直对齐
+            }
           }
         }
       }

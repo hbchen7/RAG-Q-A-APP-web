@@ -32,15 +32,15 @@ const router = createRouter({
           component: () => import('@/views/SettingPage.vue'),
           children: [
             {
-              path: 'modelConfig',
-              name: 'modelConfig',
-              component: () => import('@/views/setting/modelsConfigPage.vue'),
-            },
-
-            {
               path: 'about',
               name: 'about',
               component: () => import('@/views/setting/aboutPage.vue'),
+            },
+
+            {
+              path: 'modelsConfig',
+              name: 'modelsConfig',
+              component: () => import('@/views/setting/modelsConfigPage.vue'),
             },
           ],
         },

@@ -1,6 +1,6 @@
 <script setup>
 import { RouterView, useRouter } from 'vue-router'
-import { ChatDotSquare, Setting } from '@element-plus/icons-vue'
+import { Setting } from '@element-plus/icons-vue'
 const router = useRouter()
 
 // 导航到对应路由
@@ -21,10 +21,10 @@ const handleNavigation = (route) => {
           :collapse="false"
           :collapse-transition="false"
         >
-          <el-menu-item index="chat" @click="handleNavigation('modelConfig')">
+          <!-- <el-menu-item index="chat" @click="handleNavigation('modelConfig')">
             <el-icon><ChatDotSquare /></el-icon>
             <span class="menu-text">模型服务</span>
-          </el-menu-item>
+          </el-menu-item> -->
 
           <el-menu-item index="setting" @click="handleNavigation('about')">
             <el-icon><Setting /></el-icon>

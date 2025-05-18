@@ -123,13 +123,48 @@ export const useKnowledgeStore = defineStore(
       try {
         await uploadFileToKnowledgeBase(kbId, formData)
         ElMessage.success('文件上传成功')
+
+        // 记录上传前的聊天选择状态
+        const previousChatKbId = KBtoChat.value?._id
+        const previousChatFileMd5 = FileToChat.value?.file_md5 // 也记录文件
+
         await fetchKnowledgeBases() // 重新加载列表以更新文件列表
-        // 或者可以尝试局部更新:
-        // const kbIndex = knowledgeBases.value.findIndex(kb => kb._id === kbId);
-        // if (kbIndex !== -1) {
-        //   // 需要 API 返回新文件的信息才能精确更新
-        //   // 假设 API 返回了更新后的文件列表 或 新文件对象
-        // }
+
+        // ---- 新增：更新聊天选择状态 ----
+        if (previousChatKbId) {
+          // 查找更新后的知识库对象
+          const updatedKbInChat = knowledgeBases.value.find(
+            (kb) => kb._id === previousChatKbId,
+          )
+          if (updatedKbInChat) {
+            // 如果找到了，更新 KBtoChat 为新的对象引用
+            KBtoChat.value = updatedKbInChat
+
+            // 检查之前选中的文件是否还存在于更新后的文件列表中
+            // （上传新文件后，之前选中的文件应该仍然存在）
+            if (previousChatFileMd5) {
+              const updatedFileInChat = updatedKbInChat.filesList.find(
+                (f) => f.file_md5 === previousChatFileMd5,
+              )
+              if (updatedFileInChat) {
+                // 文件仍然存在，更新 FileToChat 为新的文件对象引用
+                FileToChat.value = updatedFileInChat
+              } else {
+                // 理论上不应该发生，但以防万一，清空文件选择
+                FileToChat.value = null
+              }
+            } else {
+              // 之前没有选择文件，保持 null
+              FileToChat.value = null
+            }
+          } else {
+            // 如果之前选中的知识库在刷新后找不到了，清空聊天选择
+            KBtoChat.value = null
+            FileToChat.value = null
+          }
+        }
+        // ---- 结束：更新聊天选择状态 ----
+
         return true
       } catch (err) {
         console.error('文件上传失败:', err)
@@ -160,12 +195,47 @@ export const useKnowledgeStore = defineStore(
         try {
           await deleteFileFromKnowledgeBase(kbId, fileMd5)
           ElMessage.success('文件删除成功')
+
+          // 记录删除前的聊天选择状态
+          const previousChatKbId = KBtoChat.value?._id
+          const previousChatFileMd5 = FileToChat.value?.file_md5
+
           await fetchKnowledgeBases() // 重新加载列表
-          // 或者局部更新
-          // const kbIndex = knowledgeBases.value.findIndex(kb => kb._id === kbId);
-          // if (kbIndex !== -1) {
-          //   knowledgeBases.value[kbIndex].filesList = knowledgeBases.value[kbIndex].filesList.filter(f => f.file_md5 !== fileMd5);
-          // }
+
+          // ---- 新增：更新聊天选择状态 ----
+          if (previousChatKbId) {
+            // 查找更新后的知识库对象
+            const updatedKbInChat = knowledgeBases.value.find(
+              (kb) => kb._id === previousChatKbId,
+            )
+            if (updatedKbInChat) {
+              // 如果找到了，更新 KBtoChat 为新的对象引用
+              KBtoChat.value = updatedKbInChat
+
+              // 检查之前选中的文件是否还存在于更新后的文件列表中
+              if (previousChatFileMd5) {
+                const updatedFileInChat = updatedKbInChat.filesList.find(
+                  (f) => f.file_md5 === previousChatFileMd5,
+                )
+                if (updatedFileInChat) {
+                  // 文件仍然存在，更新 FileToChat 为新的文件对象引用
+                  FileToChat.value = updatedFileInChat
+                } else {
+                  // 文件已被删除或不存在，清空文件选择
+                  FileToChat.value = null
+                }
+              } else {
+                // 之前没有选择文件，保持 null
+                FileToChat.value = null
+              }
+            } else {
+              // 如果之前选中的知识库在刷新后找不到了（不太可能，除非KB被同时删除），清空聊天选择
+              KBtoChat.value = null
+              FileToChat.value = null
+            }
+          }
+          // ---- 结束：更新聊天选择状态 ----
+
           return true
         } catch (err) {
           console.error('删除文件失败:', err)

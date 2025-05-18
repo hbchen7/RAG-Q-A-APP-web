@@ -112,7 +112,7 @@
               <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
               <template #tip>
                 <div class="el-upload__tip">
-                  现支持 PDF、Txt等格式，现支持上传5MB以内的文件
+                  现支持 PDF、Txt等格式，现支持上传以内的文件
                 </div>
               </template>
             </el-upload>
@@ -182,6 +182,7 @@ import {
   ElDropdownItem,
   ElSkeleton,
   ElMessage,
+  ElNotification,
 } from 'element-plus'
 import { Plus, Delete, MoreFilled, UploadFilled } from '@element-plus/icons-vue'
 import { useKnowledgeStore } from '@/stores/modules/knowledge'
@@ -267,18 +268,31 @@ const formatDate = (dateTimeString) => {
  * @returns {boolean | Promise<File>}
  */
 const beforeUploadCheck = (rawFile) => {
-  // 示例：检查文件大小 (100MB)
-  const maxSize = 100 * 1024 * 1024
+  // 检查文件类型
+  const allowedTypes = ['application/pdf', 'text/plain']
+  const fileExtension = rawFile.name.split('.').pop()?.toLowerCase() // 获取小写扩展名
+
+  // 检查 MIME 类型 或 文件扩展名
+  if (
+    !allowedTypes.includes(rawFile.type) &&
+    !['pdf', 'txt', 'md'].includes(fileExtension || '')
+  ) {
+    ElNotification({
+      title: '上传失败',
+      message: '现支持 PDF TXT 文档格式',
+      type: 'warning',
+      duration: 3000, // 显示时长，单位毫秒
+    })
+    return false // 阻止上传
+  }
+
+  // 检查文件大小 (示例：)
+  const maxSize = 5 * 1024 * 1024 // 4MB
   if (rawFile.size > maxSize) {
-    ElMessage.error('文件大小不能超过 100MB!')
+    ElMessage.error('文件大小不能超过 4MB!')
     return false
   }
-  // 可以添加文件类型检查
-  // const allowedTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-  // if (!allowedTypes.includes(rawFile.type)) {
-  //     ElMessage.error('不支持的文件类型!');
-  //     return false;
-  // }
+
   return true // 允许上传
 }
 
