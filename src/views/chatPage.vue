@@ -155,13 +155,16 @@ watch(isAgentEnabled, (newValue) => {
   if (newValue) {
     ElNotification({
       title: '已启用agent',
-      message: 'agent模式即将支持使用知识库功能',
+      dangerouslyUseHTMLString: true,
+      message:
+        'agent模式即将支持使用知识库功能<br />即将支持会话记忆功能<br />如您刷新后发现会话记录消失属于正常现象',
       type: 'info',
     })
   } else {
     ElNotification({
       title: '已关闭agent',
-      message: '您现在可以使用知识库功能',
+      dangerouslyUseHTMLString: true,
+      message: '您现在可以使用知识库功能<br />并支持会话记忆功能',
       type: 'info',
     })
   }
@@ -474,6 +477,14 @@ const sendMessage = async () => {
   try {
     console.log('发送流式消息 payload:', messagePayload)
     // 启用agent,则使用"/agent/mcp",若不启用，则使用"/chat/stream"
+    if (isAgentEnabled.value) {
+      ElNotification({
+        title: 'MCP服务连接中...',
+        message: '请稍后...',
+        type: 'info',
+        duration: 3000,
+      })
+    }
     const endpoint = isAgentEnabled.value ? '/agent/mcp' : '/chat/stream'
     console.log(
       `发送消息，Agent模式: ${isAgentEnabled.value ? '启用' : '关闭'}, 端点: ${endpoint}`,
@@ -525,7 +536,12 @@ const sendMessage = async () => {
           if (parsedData.type === 'context') {
             // 处理上下文信息，可以使用 ElNotification 弹出通知
             console.log('Context received:', parsedData.data)
-            ElNotification({ title: 'Context', message: parsedData.data, type: 'info' })
+            ElNotification({
+              title: 'Context',
+              message: parsedData.data,
+              type: 'info',
+              duration: 2000,
+            })
           } else if (parsedData.type === 'chunk') {
             // 核心：处理文本块
             accumulatedContent += parsedData.data // 将新块追加到累积内容
@@ -551,6 +567,7 @@ const sendMessage = async () => {
               title: 'Tool call initiated',
               message: `工具: ${parsedData.data.name}`,
               type: 'info',
+              duration: 2000,
             })
           } else if (parsedData.type === 'tool_result') {
             console.log('Tool result received:', parsedData.data)
@@ -566,6 +583,7 @@ const sendMessage = async () => {
                   title: 'Tool Result Received',
                   message: `工具 ${currentAiMessage.tool_calls[toolCallIndex].name} 执行完毕。`,
                   type: 'success',
+                  duration: 2000,
                 })
               } else {
                 console.warn(
@@ -828,11 +846,7 @@ const handleDeleteButtonClick = () => {
 
 // 新增：处理设置按钮点击
 const handleSettingButtonClick = () => {
-  ElNotification({
-    title: 'Hello~你好呀',
-    message: '功能开发中，敬请期待',
-    type: 'info',
-  })
+  activeTab.value = 'settings' // 切换到设置选项卡
 }
 
 // 新增：处理工具调用显示区域更新
@@ -1226,7 +1240,7 @@ const handleShowResultDialogUpdate = (messageItem, call_id, value) => {
             <!-- 右侧聊天按钮组 -->
             <div class="right-controls-wrapper">
               <div class="custom-control-in-group">
-                <span class="agent-switch-label">启用agent</span>
+                <span class="agent-switch-label">启用Agent-Beta</span>
                 <el-switch
                   v-model="isAgentEnabled"
                   size="small"

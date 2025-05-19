@@ -1,7 +1,7 @@
 <script setup>
 import { RouterView, useRouter } from 'vue-router'
 import { ref, computed } from 'vue'
-import { ChatDotSquare, Collection, User, Setting } from '@element-plus/icons-vue'
+import { ChatDotSquare, Collection, Menu, Setting } from '@element-plus/icons-vue'
 import { ElNotification } from 'element-plus'
 import { useAuthStore, oneapiModelListStore } from '@/stores'
 import userAvatar from '@/assets/ic_user.jpg' // 导入用户头像图片
@@ -129,8 +129,8 @@ const handleLogout = () => {
             <template #title>知识库</template>
           </el-menu-item>
 
-          <el-menu-item index="personal" @click="handleNavigation('personal')">
-            <el-icon><User /></el-icon>
+          <el-menu-item index="mcp" @click="handleNavigation('mcp')">
+            <el-icon><Menu /></el-icon>
             <template #title>MCP</template>
           </el-menu-item>
 

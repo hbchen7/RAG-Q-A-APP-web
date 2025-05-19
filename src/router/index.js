@@ -25,7 +25,11 @@ const router = createRouter({
           name: 'library',
           component: () => import('@/views/KnowledgeBase.vue'),
         },
-
+        {
+          path: 'mcp',
+          name: 'mcp',
+          component: () => import('@/views/McpPage.vue'),
+        },
         {
           path: 'setting',
           name: 'setting',
