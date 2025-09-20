@@ -129,9 +129,11 @@ const embeddingModels = [
   'text-embedding-3-small',
   'text-embedding-3-large',
   'text-embedding-ada-002',
-  'e5-mistral', // 确认这是否确实是 embedding-only
+  'e5-mistral',
   'jina-embeddings-v2-base-en',
   'bge-large-en-v1.5',
+  'bge-large-zh-v1.5',
+  'BAAI/bge-large-zh-v1.5',
   'bge-small-zh',
   'bge-multilingual-gemma2',
   'bge-icl',
@@ -156,8 +158,7 @@ watch(isAgentEnabled, (newValue) => {
     ElNotification({
       title: '已启用agent',
       dangerouslyUseHTMLString: true,
-      message:
-        'agent模式即将支持使用知识库功能<br />即将支持会话记忆功能<br />如您刷新后发现会话记录消失属于正常现象',
+      message: 'agent模式支持调用MCP工具与知识库检索',
       type: 'info',
     })
   } else {
@@ -290,7 +291,7 @@ const knowledge_config = computed(() => {
   }
 
   if (file) {
-    config.filter_by_file_md5 = file.file_md5 // 如果选择了文件，添加文件过滤条件
+    config.filter_by_file_md5 = [file.file_md5] // 如果选择了文件，添加文件过滤条件
   }
 
   return config
@@ -363,6 +364,7 @@ const loadMoreMessages = async () => {
       page: currentPage.value,
       page_size: pageSize.value,
     })
+    console.log('loadMoreMessages response', response)
 
     const scrollbar = scrollbarRef.value?.wrap
     const oldScrollHeight = scrollbar?.scrollHeight || 0
@@ -479,8 +481,7 @@ const sendMessage = async () => {
     // 启用agent,则使用"/agent/mcp",若不启用，则使用"/chat/stream"
     if (isAgentEnabled.value) {
       ElNotification({
-        title: 'MCP服务连接中...',
-        message: '请稍后...',
+        title: 'Agent正在思考中...',
         type: 'info',
         duration: 3000,
       })
@@ -567,7 +568,7 @@ const sendMessage = async () => {
               title: 'Tool call initiated',
               message: `工具: ${parsedData.data.name}`,
               type: 'info',
-              duration: 2000,
+              duration: 1000,
             })
           } else if (parsedData.type === 'tool_result') {
             console.log('Tool result received:', parsedData.data)
@@ -583,7 +584,7 @@ const sendMessage = async () => {
                   title: 'Tool Result Received',
                   message: `工具 ${currentAiMessage.tool_calls[toolCallIndex].name} 执行完毕。`,
                   type: 'success',
-                  duration: 2000,
+                  duration: 1500,
                 })
               } else {
                 console.warn(
@@ -639,6 +640,7 @@ const sendMessage = async () => {
         isStreaming.value = false // 重置流式状态
         abortController.value = null // 重置 AbortController 引用
         scrollToBottom() // 确保最后滚动到底部
+        console.log('currentAiMessage', messages.value[messages.value.length - 1])
       },
 
       // 8.4 onerror: 发生错误时调用 (网络错误、onopen/onmessage 中抛出的错误、AbortError)

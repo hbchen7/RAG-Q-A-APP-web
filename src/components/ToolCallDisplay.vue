@@ -1,3 +1,5 @@
+<!-- 工具调用显示组件,嵌入在消息气泡中 -->
+
 <script setup>
 import { defineProps, defineEmits, computed } from 'vue'
 import { ElButton, ElDialog, ElScrollbar } from 'element-plus'

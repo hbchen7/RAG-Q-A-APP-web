@@ -112,7 +112,7 @@
               <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
               <template #tip>
                 <div class="el-upload__tip">
-                  现支持 PDF、Txt等格式，现支持上传以内的文件
+                  现支持 .md、.pdf、.txt 等格式，现支持上传4MB以内的文件
                 </div>
               </template>
             </el-upload>
@@ -279,7 +279,7 @@ const beforeUploadCheck = (rawFile) => {
   ) {
     ElNotification({
       title: '上传失败',
-      message: '现支持 PDF TXT 文档格式',
+      message: '现支持 .md、.pdf、.txt 文档格式',
       type: 'warning',
       duration: 3000, // 显示时长，单位毫秒
     })

@@ -343,23 +343,23 @@ const handleConfirm = async () => {
     // 1. 执行基础表单校验
     await formRef.value.validate()
 
-    // --- 新增检查逻辑 开始 ---
-    // 2. 检查选择的模型是否为嵌入模型
-    const selectedModelNameLower = form.embeddingModel?.toLowerCase() // 获取选中模型名称并转小写
+    // // --- 新增检查逻辑 开始 ---
+    // // 2. 检查选择的模型是否为嵌入模型
+    // const selectedModelNameLower = form.embeddingModel?.toLowerCase() // 获取选中模型名称并转小写
 
-    // 检查 selectedModelNameLower 是否包含 embeddingModels 数组中的任何一个元素
-    const isEmbeddingModelSelected =
-      selectedModelNameLower &&
-      embeddingModels.some((embedModel) => selectedModelNameLower.includes(embedModel))
+    // // 检查 selectedModelNameLower 是否包含 embeddingModels 数组中的任何一个元素
+    // const isEmbeddingModelSelected =
+    //   selectedModelNameLower &&
+    //   embeddingModels.some((embedModel) => selectedModelNameLower.includes(embedModel))
 
-    if (!isEmbeddingModelSelected) {
-      // 如果选择的不是嵌入模型，则提示并阻止
-      ElMessage.warning(
-        '请选择一个有效的嵌入模型进行知识库创建，例如 bge-m3 或 text-embedding 系列。',
-      )
-      return // 阻止后续执行
-    }
-    // --- 新增检查逻辑 结束 ---
+    // if (!isEmbeddingModelSelected) {
+    //   // 如果选择的不是嵌入模型，则提示并阻止
+    //   ElMessage.warning(
+    //     '请选择一个有效的嵌入模型进行知识库创建，例如 bge-m3 或 text-embedding 系列。',
+    //   )
+    //   return // 阻止后续执行
+    // }
+    // // --- 新增检查逻辑 结束 ---
 
     // 3. (如果通过检查) 查找选中的令牌以获取原始 Key
     const selectedToken = oneapiStore.tokenList.find((t) => t.id === form.selectedTokenId)

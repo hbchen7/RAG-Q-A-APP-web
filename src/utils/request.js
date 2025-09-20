@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 
 // 从环境变量读取基础 URL
 const baseURL = import.meta.env.VITE_API_BASE_URL
-
+console.log('baseURL', baseURL)
 if (!baseURL) {
   console.error('错误：VITE_API_BASE_URL 环境变量未设置！请检查 .env 文件。')
   throw new Error('VITE_API_BASE_URL is not defined')

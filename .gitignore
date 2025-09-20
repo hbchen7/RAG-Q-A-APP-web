@@ -2,9 +2,9 @@
 /doc
 .env.production
 .specstory/
-
-.cursorrules
-.cursorindexingignore
+CICD.bat
+dist*
+.cursor*
 
 
 # Environment variables

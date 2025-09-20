@@ -18,12 +18,15 @@ export const createKnowledge = (data) => {
 }
 
 /**
- * @description 上传文件到指定的知识库
+ * @description 上传文件到指定的知识库（异步处理）
  * @param {string} kbId - 目标知识库的 ID
- * @param {FormData} formData - 包含文件和其他参数的 FormData 对象
- *   - formData.append('file', fileObject) // 文件对象
- *   - formData.append('is_reorder', isReorder) // (可选, boolean)
- * @returns {Promise<object>} 上传结果
+ * @param {FormData} formData - 包含文件的 FormData 对象
+ *   - formData.append('file', fileObject) // 文件对象（必需）
+ * @returns {Promise<object>} 包含任务ID的响应对象
+ * @returns {string} returns.task_id - 文件处理任务ID，可用于查询处理状态
+ * @returns {string} returns.message - 操作结果消息
+ * @note 文件上传后会异步处理，使用返回的 task_id 调用 getTaskStatus() 查询处理进度
+ * @note Embedding 配置（模型、供应商、API密钥）将从知识库记录中自动获取，无需手动传递
  */
 export const uploadFileToKnowledgeBase = (kbId, formData) => {
   return request.post(`/knowledge/${kbId}/files/`, formData, {
@@ -31,6 +34,12 @@ export const uploadFileToKnowledgeBase = (kbId, formData) => {
       'Content-Type': 'multipart/form-data', // 必须设置请求头为 multipart/form-data
     },
   })
+  /**响应示例
+   * {
+   *   "task_id": "task_67ff248e0e67faaaae7c5303_20250920103000",
+   *   "message": "文件上传成功，正在异步处理中"
+   * }
+   */
 }
 
 /**
@@ -87,3 +96,52 @@ export const deleteKnowledgeBase = (kbId) => {
 export const deleteFileFromKnowledgeBase = (kbId, fileMd5) => {
   return request.delete(`/knowledge/${kbId}/files/${fileMd5}`)
 }
+
+/**
+ * @description 查询文件处理任务状态
+ * @param {string} taskId - 任务ID
+ * @returns {Promise<object>} 任务状态信息
+ * @returns {string} returns.task_id - 任务ID
+ * @returns {string} returns.status - 任务状态 (pending/processing/completed/failed)
+ * @returns {string} returns.file_name - 文件名称
+ * @returns {string} returns.kb_id - 知识库ID
+ * @returns {string} returns.created_at - 创建时间
+ * @returns {number} returns.retry_count - 重试次数
+ * @returns {string|null} returns.error_message - 错误信息 (如果有)
+ */
+export const getTaskStatus = (taskId) => {
+  return request.get(`/knowledge/tasks/${taskId}`)
+  /**响应示例
+   * {
+   *   "task_id": "task_123456",
+   *   "status": "processing",
+   *   "file_name": "document.pdf",
+   *   "kb_id": "67ff248e0e67faaaae7c5303",
+   *   "created_at": "2025-09-20T10:30:00.000000",
+   *   "retry_count": 0,
+   *   "error_message": null
+   * }
+   */
+}
+
+/**
+ * @description 查询文件处理队列状态
+ * @returns {Promise<object>} 队列状态信息
+ * @returns {number} returns.queue_size - 当前队列中的任务数量
+ * @returns {number} returns.max_queue_size - 队列最大容量
+ * @returns {number} returns.workers_count - 工作线程数量
+ * @returns {boolean} returns.is_running - 队列是否正在运行
+ */
+export const getQueueStatus = () => {
+  return request.get('/knowledge/queue/status')
+  /**响应示例
+   * {
+   *   "queue_size": 3,
+   *   "max_queue_size": 100,
+   *   "workers_count": 2,
+   *   "is_running": true
+   * }
+   */
+}
+
+// 2025年9月20日
