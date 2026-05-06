@@ -275,11 +275,11 @@ const beforeUploadCheck = (rawFile) => {
   // 检查 MIME 类型 或 文件扩展名
   if (
     !allowedTypes.includes(rawFile.type) &&
-    !['pdf', 'txt', 'md'].includes(fileExtension || '')
+    !['pdf', 'txt', 'md', 'json'].includes(fileExtension || '')
   ) {
     ElNotification({
       title: '上传失败',
-      message: '现支持 .md、.pdf、.txt 文档格式',
+      message: '现支持 .md、.pdf、.txt、.json 文档格式',
       type: 'warning',
       duration: 3000, // 显示时长，单位毫秒
     })
@@ -287,9 +287,9 @@ const beforeUploadCheck = (rawFile) => {
   }
 
   // 检查文件大小 (示例：)
-  const maxSize = 5 * 1024 * 1024 // 4MB
+  const maxSize = 10 * 1024 * 1024 //
   if (rawFile.size > maxSize) {
-    ElMessage.error('文件大小不能超过 4MB!')
+    ElMessage.error('文件大小不能超过 10MB!')
     return false
   }
 
