@@ -10,6 +10,8 @@ import {
   Edit,
   Collection,
   VideoPause,
+  Microphone,
+  Loading,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElEmpty, ElMessageBox, ElNotification } from 'element-plus'
 import { getSessionHistoryAPI } from '@/api/sessionAPI'
@@ -27,6 +29,8 @@ import EditAssistantDialog from '@/components/EditAssistantDialog.vue'
 import EditSessionDialog from '@/components/EditSessionDialog.vue'
 import SettingSlider from '@/components/SettingSlider.vue'
 import ToolCallDisplay from '@/components/ToolCallDisplay.vue'
+import AudioControl from '@/components/AudioControl.vue'
+import { useAudioPlayer } from '@/composables/useAudioPlayer'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 const baseURL = import.meta.env.VITE_API_BASE_URL
 const OneapiStore = oneapiModelListStore()
@@ -53,6 +57,7 @@ onUnmounted(() => {
   if (abortController.value) {
     abortController.value.abort()
   }
+  audioStop()
 })
 
 // 计算属性：当前选中的令牌名称
@@ -150,6 +155,11 @@ const tokenDropdownButtonRef = ref(null)
  * @description 如果启用了 agent 模式则为 true，否则为 false。默认为 false。
  */
 const isAgentEnabled = ref(false)
+
+// TTS 音频播放
+const { play: audioPlay, stop: audioStop } = useAudioPlayer()
+const currentPlayingMessageId = ref(null)
+const autoPlayEnabled = ref(false)
 // --- 新增代码 结束 ---
 
 // 监听 Agent 开关状态变化并发送通知
@@ -641,6 +651,14 @@ const sendMessage = async () => {
         abortController.value = null // 重置 AbortController 引用
         scrollToBottom() // 确保最后滚动到底部
         console.log('currentAiMessage', messages.value[messages.value.length - 1])
+
+        // 自动朗读
+        if (autoPlayEnabled.value) {
+          const aiMessage = messages.value.find((m) => m.id === aiMessageId)
+          if (aiMessage && aiMessage.content) {
+            handleAudioToggle(aiMessage)
+          }
+        }
       },
 
       // 8.4 onerror: 发生错误时调用 (网络错误、onopen/onmessage 中抛出的错误、AbortError)
@@ -849,6 +867,24 @@ const handleDeleteButtonClick = () => {
 // 新增：处理设置按钮点击
 const handleSettingButtonClick = () => {
   activeTab.value = 'settings' // 切换到设置选项卡
+}
+
+// TTS 音频控制
+async function handleAudioToggle(message) {
+  if (currentPlayingMessageId.value === message.id) {
+    audioStop()
+    currentPlayingMessageId.value = null
+    return
+  }
+  if (currentPlayingMessageId.value) {
+    audioStop()
+  }
+  currentPlayingMessageId.value = message.id
+  try {
+    await audioPlay(message.content)
+  } finally {
+    currentPlayingMessageId.value = null
+  }
 }
 
 // 新增：处理工具调用显示区域更新
@@ -1073,6 +1109,20 @@ const handleShowResultDialogUpdate = (messageItem, call_id, value) => {
                         "
                       />
                     </div>
+                    <div
+                      v-if="
+                        message.type === 'ai' &&
+                        message.content &&
+                        !message.isStreaming
+                      "
+                      class="message-audio-control"
+                    >
+                      <AudioControl
+                        :is-playing="currentPlayingMessageId === message.id"
+                        :is-loading="false"
+                        @toggle="handleAudioToggle(message)"
+                      />
+                    </div>
                   </div>
                 </div>
               </transition-group>
@@ -1248,6 +1298,14 @@ const handleShowResultDialogUpdate = (messageItem, call_id, value) => {
                   size="small"
                   active-color="#4B70E2"
                   inactive-color="#dcdfe6"
+                />
+              </div>
+              <div class="custom-control-in-group">
+                <el-switch
+                  v-model="autoPlayEnabled"
+                  active-text="自动朗读"
+                  inactive-text=""
+                  size="small"
                 />
               </div>
               <el-button-group>
@@ -1647,6 +1705,18 @@ const handleShowResultDialogUpdate = (messageItem, call_id, value) => {
           flex-wrap: wrap;
           gap: 8px;
         }
+
+        .message-audio-control {
+          display: flex;
+          justify-content: flex-end;
+          padding: 4px 8px;
+          opacity: 0;
+          transition: opacity $transition-duration;
+        }
+      }
+
+      .message-content-wrapper:hover .message-audio-control {
+        opacity: 1;
       }
 
       // 消息过渡动画
