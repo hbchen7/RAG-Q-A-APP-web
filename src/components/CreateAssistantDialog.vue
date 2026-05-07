@@ -51,8 +51,11 @@ watch(dialogVisible, (newVal) => {
  * @description 重置表单内容和校验状态
  */
 const resetForm = () => {
-  form.title = '新助手' // 默认值
-  form.prompt = ''
+  const now = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getMinutes())}`
+  form.title = `知识库助手-${dateStr}` // 默认值
+  form.prompt = '你是一个知识库助手，你将会依据检索到的上下文回答问题。'
   formRef.value?.resetFields() // 清除校验状态
 }
 
