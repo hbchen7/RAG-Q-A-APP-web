@@ -938,7 +938,6 @@ const handleShowResultDialogUpdate = (messageItem, call_id, value) => {
               :icon="Plus"
               circle
               size="small"
-              :disabled="!currentAssistant"
             />
           </div>
           <div class="list-content">
