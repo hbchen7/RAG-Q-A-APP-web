@@ -45,7 +45,7 @@ export const oneapiModelListStore = defineStore(
 
     // 获取当前选中令牌的可用模型列表
     const availableModels = computed(() => {
-      if (!selectedToken.value) return []
+      if (!selectedToken.value || !selectedToken.value.models) return []
       return selectedToken.value.models.split(',')
     })
 
@@ -124,14 +124,14 @@ export const oneapiModelListStore = defineStore(
       if (token.status === 0) return
       selectedToken.value = token
       // 如果当前选中的模型不在新令牌的模型列表中，清空选中的模型
-      if (selectedModel.value && !token.models.includes(selectedModel.value)) {
+      if (selectedModel.value && token.models && !token.models.includes(selectedModel.value)) {
         selectedModel.value = null
       }
     }
 
     // 选择模型
     const selectModel = (modelId) => {
-      if (!selectedToken.value || !selectedToken.value.models.includes(modelId)) return
+      if (!selectedToken.value || !selectedToken.value.models || !selectedToken.value.models.includes(modelId)) return
       selectedModel.value = modelId
     }
 
